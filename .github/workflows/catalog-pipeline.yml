@@ -8,6 +8,8 @@ on:
         required: false
         default: false
         type: boolean
+  schedule:
+    - cron: "0 5,11,17,21 * * *"
 
 jobs:
   pipeline:
