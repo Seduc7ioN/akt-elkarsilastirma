@@ -1,5 +1,57 @@
 [
   {
+    "id": "defacto-g5314axbk27",
+    "brandSlug": "defacto",
+    "title": "Baggy Fıt Pantolon",
+    "department": "Erkek",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Alt Giyim",
+    "subCategory": "Pantolon",
+    "productType": "Regular Fit",
+    "category": "Erkek > Alt Giyim > Pantolon",
+    "gender": "Erkek",
+    "fit": "Baggy Fıt",
+    "neck": "",
+    "sleeve": "",
+    "color": "Siyah",
+    "productCode": "G5314AXBK27",
+    "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-baggy-f-t-pantolon-baggy-f-t",
+    "image": "https://dfcdn.defacto.com.tr/376/F1673AX_25WN_BK27_01_03.jpg",
+    "price": 779.99,
+    "previousPrice": 1299.99,
+    "discountRate": 40,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": true,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/pantolon-3359431",
+    "campaignLabel": "Sepette indirim",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "baggy-f-t"
+    ],
+    "description": "",
+    "materials": [
+      {
+        "name": "Elastan",
+        "percent": 5
+      },
+      {
+        "name": "Viskoz",
+        "percent": 32
+      },
+      {
+        "name": "Poliester",
+        "percent": 63
+      }
+    ],
+    "materialSummary": "%5 Elastan / %32 Viskoz / %63 Poliester",
+    "availability": "in-stock",
+    "searchText": "baggy fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek baggy fit siyah %5 elastan / %32 viskoz / %63 poliester"
+  },
+  {
     "id": "defacto-t6317azbg404",
     "brandSlug": "defacto",
     "title": "Jogger Fıt Pantolon",
@@ -144,7 +196,7 @@
     "searchText": "pantolon erkek yetiskin alt giyim pantolon regular fit erkek lacivert %98 pamuk / %2 elastan"
   },
   {
-    "id": "defacto-f8974axbg766",
+    "id": "defacto-3377265",
     "brandSlug": "defacto",
     "title": "Regular Fıt Pantolon",
     "department": "Erkek",
@@ -154,12 +206,12 @@
     "productType": "Regular Fit",
     "category": "Erkek > Alt Giyim > Pantolon",
     "gender": "Erkek",
-    "fit": "Regular Fıt",
+    "fit": "Belirtilmedi",
     "neck": "",
     "sleeve": "",
     "color": "Bej",
-    "productCode": "F8974AXBG766",
-    "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-regular-f-t-pantolon-regular-f-t",
+    "productCode": "3377265",
+    "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-regular-f-t-pantolon",
     "image": "https://dfcdn.defacto.com.tr/376/A9943AX_26SP_BK27_01_01.jpg",
     "price": 1039.99,
     "previousPrice": 1299.99,
@@ -174,25 +226,64 @@
     "campaignTags": [
       "defacto",
       "basic",
+      "standart"
+    ],
+    "description": "",
+    "materials": [],
+    "materialSummary": "Materyal bilgisi yok",
+    "availability": "in-stock",
+    "searchText": "regular fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek bej materyal bilgisi yok"
+  },
+  {
+    "id": "defacto-g2501axbk81",
+    "brandSlug": "defacto",
+    "title": "Regular Fıt Pantolon",
+    "department": "Erkek",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Alt Giyim",
+    "subCategory": "Pantolon",
+    "productType": "Regular Fit",
+    "category": "Erkek > Alt Giyim > Pantolon",
+    "gender": "Erkek",
+    "fit": "Regular Fıt",
+    "neck": "",
+    "sleeve": "",
+    "color": "Siyah",
+    "productCode": "G2501AXBK81",
+    "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-regular-f-t-pantolon-regular-f-t",
+    "image": "https://dfcdn.defacto.com.tr/376/C7508AX_26SP_BG609_01_01.jpg",
+    "price": 999.99,
+    "previousPrice": 999.99,
+    "discountRate": 0,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": false,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/chino-kanvas-pantolon-3375517",
+    "campaignLabel": "Liste fiyati",
+    "campaignTags": [
+      "defacto",
+      "basic",
       "regular-f-t"
     ],
     "description": "",
     "materials": [
       {
-        "name": "Poliamid",
-        "percent": 92
+        "name": "Pamuk",
+        "percent": 98
       },
       {
         "name": "Elastan",
-        "percent": 8
+        "percent": 2
       }
     ],
-    "materialSummary": "%92 Poliamid / %8 Elastan",
+    "materialSummary": "%98 Pamuk / %2 Elastan",
     "availability": "in-stock",
-    "searchText": "regular fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek regular fit bej %92 poliamid / %8 elastan"
+    "searchText": "regular fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek regular fit siyah %98 pamuk / %2 elastan"
   },
   {
-    "id": "defacto-g6409axbk81",
+    "id": "defacto-h4566axbn337",
     "brandSlug": "defacto",
     "title": "Relax Fıt Pantolon",
     "department": "Erkek",
@@ -205,20 +296,20 @@
     "fit": "Relax Fıt",
     "neck": "",
     "sleeve": "",
-    "color": "Siyah",
-    "productCode": "G6409AXBK81",
+    "color": "Kahve",
+    "productCode": "H4566AXBN337",
     "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-relax-f-t-pantolon-relax-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/G6603AX_26SP_KH487_01_02.jpg",
-    "price": 599.99,
-    "previousPrice": 999.99,
-    "discountRate": 40,
+    "image": "https://dfcdn.defacto.com.tr/376/G1036AX_26SP_BK81_01_03.jpg",
+    "price": 1499.99,
+    "previousPrice": 1499.99,
+    "discountRate": 0,
     "currency": "TRY",
     "startDate": "2026-04-12",
     "endDate": "2026-04-19",
-    "isFeatured": true,
+    "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/relax-fit-jogger-pantolon-3370097",
-    "campaignLabel": "Sepette indirim",
+    "sourceUrl": "https://www.defacto.com.tr/relax-fit-pantolon-3437112",
+    "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
       "basic",
@@ -228,23 +319,19 @@
     "materials": [
       {
         "name": "Pamuk",
-        "percent": 38
+        "percent": 53
       },
       {
-        "name": "Elastan",
-        "percent": 3
-      },
-      {
-        "name": "Poliester",
-        "percent": 59
+        "name": "Lyocell",
+        "percent": 47
       }
     ],
-    "materialSummary": "%38 Pamuk / %3 Elastan / %59 Poliester",
+    "materialSummary": "%53 Pamuk / %47 Lyocell",
     "availability": "in-stock",
-    "searchText": "relax fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek relax fit siyah %38 pamuk / %3 elastan / %59 poliester"
+    "searchText": "relax fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek relax fit kahve %53 pamuk / %47 lyocell"
   },
   {
-    "id": "defacto-g1036axbk81",
+    "id": "defacto-b2089axbk81",
     "brandSlug": "defacto",
     "title": "Slım Fıt Pantolon",
     "department": "Erkek",
@@ -258,19 +345,19 @@
     "neck": "",
     "sleeve": "",
     "color": "Siyah",
-    "productCode": "G1036AXBK81",
+    "productCode": "B2089AXBK81",
     "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-sl-m-f-t-pantolon-sl-m-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/C9163AX_26SP_BK81_01_01.jpg",
-    "price": 1299.99,
-    "previousPrice": 1299.99,
-    "discountRate": 0,
+    "image": "https://dfcdn.defacto.com.tr/376/T6317AZ_26SP_BK27_01_08.jpg",
+    "price": 500,
+    "previousPrice": 999.99,
+    "discountRate": 50,
     "currency": "TRY",
     "startDate": "2026-04-12",
     "endDate": "2026-04-19",
-    "isFeatured": false,
+    "isFeatured": true,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/defactofit-pantolon-3374994",
-    "campaignLabel": "Liste fiyati",
+    "sourceUrl": "https://www.defacto.com.tr/dar-kesim-pantolon-3279547",
+    "campaignLabel": "Sepette indirim",
     "campaignTags": [
       "defacto",
       "basic",
@@ -279,69 +366,17 @@
     "description": "",
     "materials": [
       {
-        "name": "Elastan",
-        "percent": 15
+        "name": "Pamuk",
+        "percent": 98
       },
-      {
-        "name": "Naylon",
-        "percent": 85
-      }
-    ],
-    "materialSummary": "%15 Elastan / %85 Naylon",
-    "availability": "in-stock",
-    "searchText": "slim fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek slim fit siyah %15 elastan / %85 naylon"
-  },
-  {
-    "id": "defacto-c7508axbg609",
-    "brandSlug": "defacto",
-    "title": "Taılored Fıt Pantolon",
-    "department": "Erkek",
-    "ageGroup": "Yetiskin",
-    "mainCategory": "Alt Giyim",
-    "subCategory": "Pantolon",
-    "productType": "Regular Fit",
-    "category": "Erkek > Alt Giyim > Pantolon",
-    "gender": "Erkek",
-    "fit": "Taılored Fıt",
-    "neck": "",
-    "sleeve": "",
-    "color": "Bej",
-    "productCode": "C7508AXBG609",
-    "comparisonKey": "erkek-alt-giyim-pantolon-regular-fit-pantolon-ta-lored-f-t-pantolon-ta-lored-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/D7349AX_26SP_BG716_01_02.jpg",
-    "price": 1299.99,
-    "previousPrice": 1299.99,
-    "discountRate": 0,
-    "currency": "TRY",
-    "startDate": "2026-04-12",
-    "endDate": "2026-04-19",
-    "isFeatured": false,
-    "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/tailored-fit-duz-paca-her-yone-esneyen-pantolon-3376387",
-    "campaignLabel": "Liste fiyati",
-    "campaignTags": [
-      "defacto",
-      "basic",
-      "ta-lored-f-t"
-    ],
-    "description": "",
-    "materials": [
       {
         "name": "Elastan",
-        "percent": 4
-      },
-      {
-        "name": "Viskoz",
-        "percent": 31
-      },
-      {
-        "name": "Poliester",
-        "percent": 65
+        "percent": 2
       }
     ],
-    "materialSummary": "%4 Elastan / %31 Viskoz / %65 Poliester",
+    "materialSummary": "%98 Pamuk / %2 Elastan",
     "availability": "in-stock",
-    "searchText": "tailored fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek tailored fit bej %4 elastan / %31 viskoz / %65 poliester"
+    "searchText": "slim fit pantolon erkek yetiskin alt giyim pantolon regular fit erkek slim fit siyah %98 pamuk / %2 elastan"
   },
   {
     "id": "defacto-g6603axbk27",
@@ -396,6 +431,58 @@
     "searchText": "wide leg pantolon erkek yetiskin alt giyim pantolon regular fit erkek wide leg siyah %6 elastan / %20 viskoz / %74 poliester"
   },
   {
+    "id": "defacto-f8504axbk27",
+    "brandSlug": "defacto",
+    "title": "Çıtçıtlı Mont",
+    "department": "Erkek",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Dis Giyim",
+    "subCategory": "Mont",
+    "productType": "",
+    "category": "Erkek > Dis Giyim > Mont",
+    "gender": "Erkek",
+    "fit": "Regular Fıt",
+    "neck": "Polo Yaka",
+    "sleeve": "",
+    "color": "Siyah",
+    "productCode": "F8504AXBK27",
+    "comparisonKey": "erkek-dis-giyim-mont-mont-c-tc-tl-mont-regular-f-t",
+    "image": "https://dfcdn.defacto.com.tr/376/G9718AX_26SP_BK81_01_02.jpg",
+    "price": 1999.99,
+    "previousPrice": 1999.99,
+    "discountRate": 0,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": false,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/regular-fit-polo-yaka-citcitli-mont-3375053",
+    "campaignLabel": "Liste fiyati",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "regular-f-t"
+    ],
+    "description": "",
+    "materials": [
+      {
+        "name": "Pamuk",
+        "percent": 24
+      },
+      {
+        "name": "Elastan",
+        "percent": 2
+      },
+      {
+        "name": "Poliester",
+        "percent": 74
+      }
+    ],
+    "materialSummary": "%24 Pamuk / %2 Elastan / %74 Poliester",
+    "availability": "in-stock",
+    "searchText": "citcitli mont erkek yetiskin dis giyim mont erkek regular fit siyah %24 pamuk / %2 elastan / %74 poliester"
+  },
+  {
     "id": "defacto-f8490axbk27",
     "brandSlug": "defacto",
     "title": "%100 Pamuk Fermuarlı Mont",
@@ -440,7 +527,7 @@
     "searchText": "%100 pamuk fermuarli mont erkek yetiskin dis giyim mont erkek regular fit siyah %100 pamuk"
   },
   {
-    "id": "defacto-h4724axbk27",
+    "id": "defacto-f7755axbg716",
     "brandSlug": "defacto",
     "title": "Fermuarlı Mont",
     "department": "Erkek",
@@ -453,19 +540,19 @@
     "fit": "Regular Fıt",
     "neck": "Polo Yaka",
     "sleeve": "",
-    "color": "Siyah",
-    "productCode": "H4724AXBK27",
+    "color": "Bej",
+    "productCode": "F7755AXBG716",
     "comparisonKey": "erkek-dis-giyim-mont-mont-fermuarl-mont-regular-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/D7338AX_26SP_KH522_01_01.jpg",
-    "price": 2499.99,
-    "previousPrice": 2499.99,
+    "image": "https://dfcdn.defacto.com.tr/376/F7871AX_26SP_GR305_01_01.jpg",
+    "price": 1799.99,
+    "previousPrice": 1799.99,
     "discountRate": 0,
     "currency": "TRY",
     "startDate": "2026-04-12",
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/regular-fit-polo-yaka-astarli-fermuarli-mont-3437055",
+    "sourceUrl": "https://www.defacto.com.tr/regular-fit-polo-yaka-astarli-fermuarli-mont-3376112",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
@@ -475,21 +562,13 @@
     "description": "",
     "materials": [
       {
-        "name": "Elastan",
-        "percent": 5
-      },
-      {
-        "name": "Viskoz",
-        "percent": 35
-      },
-      {
         "name": "Poliester",
-        "percent": 60
+        "percent": 100
       }
     ],
-    "materialSummary": "%5 Elastan / %35 Viskoz / %60 Poliester",
+    "materialSummary": "%100 Poliester",
     "availability": "in-stock",
-    "searchText": "fermuarli mont erkek yetiskin dis giyim mont erkek regular fit siyah %5 elastan / %35 viskoz / %60 poliester"
+    "searchText": "fermuarli mont erkek yetiskin dis giyim mont erkek regular fit bej %100 poliester"
   },
   {
     "id": "defacto-f8518axnv241",
@@ -508,7 +587,7 @@
     "color": "Lacivert",
     "productCode": "F8518AXNV241",
     "comparisonKey": "erkek-dis-giyim-mont-mont-fermuarl-mont-regular-f-t-uzun-kollu",
-    "image": "https://dfcdn.defacto.com.tr/376/F8460AX_26SP_BK27_01_03.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/F7871AX_26SP_KH151_01_01.jpg",
     "price": 1399.99,
     "previousPrice": 1999.99,
     "discountRate": 30,
@@ -552,7 +631,7 @@
     "color": "Kahve",
     "productCode": "A3869AXBN539",
     "comparisonKey": "erkek-dis-giyim-mont-mont-fermuarl-mont-sl-m-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/F8461AX_26SP_KH404_01_02.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/D6305AX_26SP_KH271_01_01.jpg",
     "price": 2099.99,
     "previousPrice": 2999.99,
     "discountRate": 30,
@@ -578,6 +657,50 @@
     "materialSummary": "%100 Poliester",
     "availability": "in-stock",
     "searchText": "fermuarli mont erkek yetiskin dis giyim mont erkek slim fit kahve %100 poliester"
+  },
+  {
+    "id": "defacto-f8460axbk27",
+    "brandSlug": "defacto",
+    "title": "Mont",
+    "department": "Erkek",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Dis Giyim",
+    "subCategory": "Mont",
+    "productType": "",
+    "category": "Erkek > Dis Giyim > Mont",
+    "gender": "Erkek",
+    "fit": "Oversıze",
+    "neck": "Dik Yaka",
+    "sleeve": "Uzun Kollu",
+    "color": "Siyah",
+    "productCode": "F8460AXBK27",
+    "comparisonKey": "erkek-dis-giyim-mont-mont-mont-overs-ze-uzun-kollu",
+    "image": "https://dfcdn.defacto.com.tr/376/A3519AX_25WN_BK81_01_02.jpg",
+    "price": 1399.99,
+    "previousPrice": 1999.99,
+    "discountRate": 30,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": true,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/oversize-genis-kalip-dik-yaka-su-gecirmez-mont-3375213",
+    "campaignLabel": "Sepette indirim",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "overs-ze"
+    ],
+    "description": "",
+    "materials": [
+      {
+        "name": "Poliester",
+        "percent": 100
+      }
+    ],
+    "materialSummary": "%100 Poliester",
+    "availability": "in-stock",
+    "searchText": "mont erkek yetiskin dis giyim mont erkek oversize siyah %100 poliester"
   },
   {
     "id": "defacto-f1148axkh151",
@@ -640,7 +763,7 @@
     "color": "Bej",
     "productCode": "G6157AXBG74",
     "comparisonKey": "erkek-dis-giyim-mont-mont-mont-regular-f-t-uzun-kollu",
-    "image": "https://dfcdn.defacto.com.tr/376/A3519AX_25WN_BK81_01_02.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/F7755AX_26SP_BK27_01_01.jpg",
     "price": 1999.99,
     "previousPrice": 1999.99,
     "discountRate": 0,
@@ -666,6 +789,54 @@
     "materialSummary": "%100 Naylon",
     "availability": "in-stock",
     "searchText": "mont erkek yetiskin dis giyim mont erkek regular fit bej %100 naylon"
+  },
+  {
+    "id": "defacto-f8926axkh422",
+    "brandSlug": "defacto",
+    "title": "Rüzgar Geçirmez Su İtici Fermuarlı Mont",
+    "department": "Erkek",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Dis Giyim",
+    "subCategory": "Mont",
+    "productType": "",
+    "category": "Erkek > Dis Giyim > Mont",
+    "gender": "Erkek",
+    "fit": "Regular Fıt",
+    "neck": "Kapüşonlu",
+    "sleeve": "Uzun Kollu",
+    "color": "Haki",
+    "productCode": "F8926AXKH422",
+    "comparisonKey": "erkek-dis-giyim-mont-mont-ruzgar-gecirmez-su-itici-fermuarl-mont-regular-f-t-uzun-kollu",
+    "image": "https://dfcdn.defacto.com.tr/376/H4724AX_26SP_BK27_01_01.jpg",
+    "price": 2499.99,
+    "previousPrice": 2499.99,
+    "discountRate": 0,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": false,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/defactofit-regular-fit-kapusonlu-fermuarli-mont-3374831",
+    "campaignLabel": "Liste fiyati",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "regular-f-t"
+    ],
+    "description": "",
+    "materials": [
+      {
+        "name": "Elastan",
+        "percent": 10
+      },
+      {
+        "name": "Poliester",
+        "percent": 90
+      }
+    ],
+    "materialSummary": "%10 Elastan / %90 Poliester",
+    "availability": "in-stock",
+    "searchText": "ruzgar gecirmez su itici fermuarli mont erkek yetiskin dis giyim mont erkek regular fit haki %10 elastan / %90 poliester"
   },
   {
     "id": "defacto-y4461azbk27",
@@ -710,58 +881,6 @@
     "materialSummary": "%100 Poliester",
     "availability": "in-stock",
     "searchText": "su itici fermuarli mont erkek yetiskin dis giyim mont erkek oversize siyah %100 poliester"
-  },
-  {
-    "id": "defacto-g9718axbk81",
-    "brandSlug": "defacto",
-    "title": "Premıum Oversıze Mont",
-    "department": "Erkek",
-    "ageGroup": "Yetiskin",
-    "mainCategory": "Dis Giyim",
-    "subCategory": "Mont",
-    "productType": "Oversize",
-    "category": "Erkek > Dis Giyim > Mont",
-    "gender": "Erkek",
-    "fit": "Oversıze",
-    "neck": "",
-    "sleeve": "Uzun Kollu",
-    "color": "Siyah",
-    "productCode": "G9718AXBK81",
-    "comparisonKey": "erkek-dis-giyim-mont-oversize-mont-prem-um-overs-ze-mont-overs-ze-uzun-kollu",
-    "image": "https://dfcdn.defacto.com.tr/376/G0433AX_26SP_BG766_01_02.jpg",
-    "price": 1999.99,
-    "previousPrice": 1999.99,
-    "discountRate": 0,
-    "currency": "TRY",
-    "startDate": "2026-04-12",
-    "endDate": "2026-04-19",
-    "isFeatured": false,
-    "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/oversize-genis-kalip-mont-3407404",
-    "campaignLabel": "Liste fiyati",
-    "campaignTags": [
-      "defacto",
-      "basic",
-      "overs-ze"
-    ],
-    "description": "",
-    "materials": [
-      {
-        "name": "Elastan",
-        "percent": 5
-      },
-      {
-        "name": "Viskoz",
-        "percent": 19
-      },
-      {
-        "name": "Poliester",
-        "percent": 76
-      }
-    ],
-    "materialSummary": "%5 Elastan / %19 Viskoz / %76 Poliester",
-    "availability": "in-stock",
-    "searchText": "premium oversize mont erkek yetiskin dis giyim mont oversize erkek oversize siyah %5 elastan / %19 viskoz / %76 poliester"
   },
   {
     "id": "lcwaikiki-s5re00z8-z4g",
@@ -2154,9 +2273,9 @@
     "searchText": "yuksek bel cep detayli kemerli genis paca kumas pantolon kadin yetiskin alt giyim pantolon kadin regular fit materyal bilgisi yok"
   },
   {
-    "id": "defacto-g9896axpn590",
+    "id": "defacto-e1981axbk27",
     "brandSlug": "defacto",
-    "title": "Balloon Fıt Normal Bel Poplin Pantolon",
+    "title": "Beli Lastikli Wıde Leg Pantolon",
     "department": "Kadin",
     "ageGroup": "Yetiskin",
     "mainCategory": "Alt Giyim",
@@ -2164,38 +2283,42 @@
     "productType": "Regular Fit",
     "category": "Kadin > Alt Giyim > Pantolon",
     "gender": "Kadın",
-    "fit": "Balloon Fıt",
+    "fit": "Wıde Leg",
     "neck": "",
     "sleeve": "",
-    "color": "Pembe",
-    "productCode": "G9896AXPN590",
-    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-balloon-f-t-normal-bel-poplin-pantolon-balloon-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/F6249AX_26SP_NV218_01_02.jpg",
-    "price": 1299.99,
-    "previousPrice": 1299.99,
+    "color": "Siyah",
+    "productCode": "E1981AXBK27",
+    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-beli-lastikli-w-de-leg-pantolon-w-de-leg",
+    "image": "https://dfcdn.defacto.com.tr/376/G9896AX_26SP_PN590_01_01.jpg",
+    "price": 999.99,
+    "previousPrice": 999.99,
     "discountRate": 0,
     "currency": "TRY",
     "startDate": "2026-04-12",
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/balloon-fit-normal-bel-poplin-pantolon-3422187",
+    "sourceUrl": "https://www.defacto.com.tr/wide-leg-cift-cepli-beli-lastikli-standart-boy-keten-karisimli-pantolon-3423690",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
       "basic",
-      "balloon-f-t"
+      "w-de-leg"
     ],
     "description": "",
     "materials": [
       {
-        "name": "Pamuk",
-        "percent": 100
+        "name": "Viskoz",
+        "percent": 72
+      },
+      {
+        "name": "Keten",
+        "percent": 28
       }
     ],
-    "materialSummary": "%100 Pamuk",
+    "materialSummary": "%72 Viskoz / %28 Keten",
     "availability": "in-stock",
-    "searchText": "balloon fit normal bel poplin pantolon kadin yetiskin alt giyim pantolon regular fit kadin balloon fit pembe %100 pamuk"
+    "searchText": "beli lastikli wide leg pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg siyah %72 viskoz / %28 keten"
   },
   {
     "id": "defacto-g2313axbk81",
@@ -2302,7 +2425,7 @@
     "searchText": "normal bel bilek boy pantolon kadin yetiskin alt giyim pantolon regular fit kadin siyah %5 elastan / %33 viskoz / %62 poliester"
   },
   {
-    "id": "defacto-j8743azbk27",
+    "id": "defacto-j8743azbn220",
     "brandSlug": "defacto",
     "title": "Normal Bel Sigaret Pantolon",
     "department": "Kadin",
@@ -2315,10 +2438,10 @@
     "fit": "Belirtilmedi",
     "neck": "",
     "sleeve": "",
-    "color": "Siyah",
-    "productCode": "J8743AZBK27",
+    "color": "Kahve",
+    "productCode": "J8743AZBN220",
     "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-normal-bel-sigaret-pantolon",
-    "image": "https://dfcdn.defacto.com.tr/376/C1428AX_26SP_BK81_01_03.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/E4381AX_26SP_BN473_01_01.jpg",
     "price": 799.99,
     "previousPrice": 799.99,
     "discountRate": 0,
@@ -2327,7 +2450,7 @@
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/sigaret-normal-bel-duz-paca-saten-pantolon-3374453",
+    "sourceUrl": "https://www.defacto.com.tr/sigaret-normal-bel-duz-paca-saten-pantolon-3374452",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
@@ -2351,10 +2474,10 @@
     ],
     "materialSummary": "%69 Pamuk / %4 Elastan / %27 Poliester",
     "availability": "in-stock",
-    "searchText": "normal bel sigaret pantolon kadin yetiskin alt giyim pantolon regular fit kadin siyah %69 pamuk / %4 elastan / %27 poliester"
+    "searchText": "normal bel sigaret pantolon kadin yetiskin alt giyim pantolon regular fit kadin kahve %69 pamuk / %4 elastan / %27 poliester"
   },
   {
-    "id": "defacto-f6214axgr394",
+    "id": "defacto-f6214axbk27",
     "brandSlug": "defacto",
     "title": "Normal Bel Straıght Fıt Pantolon",
     "department": "Kadin",
@@ -2367,10 +2490,10 @@
     "fit": "Straıght Fıt",
     "neck": "",
     "sleeve": "",
-    "color": "Gri",
-    "productCode": "F6214AXGR394",
+    "color": "Siyah",
+    "productCode": "F6214AXBK27",
     "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-normal-bel-stra-ght-f-t-pantolon-stra-ght-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/J8738AZ_26SM_BK27_01_01.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/J8743AZ_26SP_NV135_01_01.jpg",
     "price": 1099.99,
     "previousPrice": 1099.99,
     "discountRate": 0,
@@ -2379,7 +2502,7 @@
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/straight-fit-fleto-cepli-normal-bel-standart-boy-pantolon-3375913",
+    "sourceUrl": "https://www.defacto.com.tr/straight-fit-pantolon-3375915",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
@@ -2403,10 +2526,10 @@
     ],
     "materialSummary": "%5 Elastan / %33 Viskoz / %62 Poliester",
     "availability": "in-stock",
-    "searchText": "normal bel straight fit pantolon kadin yetiskin alt giyim pantolon regular fit kadin straight fit gri %5 elastan / %33 viskoz / %62 poliester"
+    "searchText": "normal bel straight fit pantolon kadin yetiskin alt giyim pantolon regular fit kadin straight fit siyah %5 elastan / %33 viskoz / %62 poliester"
   },
   {
-    "id": "defacto-h1921axbk81",
+    "id": "defacto-f6249axnv218",
     "brandSlug": "defacto",
     "title": "Normal Bel Wıde Leg Pantolon",
     "department": "Kadin",
@@ -2419,10 +2542,10 @@
     "fit": "Wıde Leg",
     "neck": "",
     "sleeve": "",
-    "color": "Siyah",
-    "productCode": "H1921AXBK81",
+    "color": "Lacivert",
+    "productCode": "F6249AXNV218",
     "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-normal-bel-w-de-leg-pantolon-w-de-leg",
-    "image": "https://dfcdn.defacto.com.tr/376/H0092AX_26SP_WT84_01_01.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/E7238AX_26SP_BN473_01_01.jpg",
     "price": 999.99,
     "previousPrice": 999.99,
     "discountRate": 0,
@@ -2431,7 +2554,7 @@
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/wide-leg-pantolon-3420649",
+    "sourceUrl": "https://www.defacto.com.tr/coool-wide-leg-normal-bel-pantolon-3374612",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
@@ -2442,23 +2565,23 @@
     "materials": [
       {
         "name": "Elastan",
-        "percent": 2
+        "percent": 5
       },
       {
         "name": "Viskoz",
-        "percent": 37
+        "percent": 32
       },
       {
         "name": "Poliester",
-        "percent": 61
+        "percent": 63
       }
     ],
-    "materialSummary": "%2 Elastan / %37 Viskoz / %61 Poliester",
+    "materialSummary": "%5 Elastan / %32 Viskoz / %63 Poliester",
     "availability": "in-stock",
-    "searchText": "normal bel wide leg pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg siyah %2 elastan / %37 viskoz / %61 poliester"
+    "searchText": "normal bel wide leg pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg lacivert %5 elastan / %32 viskoz / %63 poliester"
   },
   {
-    "id": "defacto-e4381axbn473",
+    "id": "defacto-e4381axbk81",
     "brandSlug": "defacto",
     "title": "%100 Pamuk Wıde Leg Normal Bel Gabardin Pantolon",
     "department": "Kadin",
@@ -2471,10 +2594,10 @@
     "fit": "Wıde Leg",
     "neck": "",
     "sleeve": "",
-    "color": "Kahve",
-    "productCode": "E4381AXBN473",
+    "color": "Siyah",
+    "productCode": "E4381AXBK81",
     "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-pamuk-w-de-leg-normal-bel-gabardin-pantolon-w-de-leg",
-    "image": "https://dfcdn.defacto.com.tr/376/F5024AX_26SM_BK27_01_01.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/J8743AZ_26SP_BK27_01_01.jpg",
     "price": 699.99,
     "previousPrice": 999.99,
     "discountRate": 30,
@@ -2483,7 +2606,7 @@
     "endDate": "2026-04-19",
     "isFeatured": true,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/100-pamuk-wide-leg-normal-bel-gabardin-pantolon-3376016",
+    "sourceUrl": "https://www.defacto.com.tr/100-pamuk-wide-leg-normal-bel-gabardin-pantolon-3376017",
     "campaignLabel": "Sepette indirim",
     "campaignTags": [
       "defacto",
@@ -2499,60 +2622,12 @@
     ],
     "materialSummary": "%100 Pamuk",
     "availability": "in-stock",
-    "searchText": "%100 pamuk wide leg normal bel gabardin pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg kahve %100 pamuk"
+    "searchText": "%100 pamuk wide leg normal bel gabardin pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg siyah %100 pamuk"
   },
   {
-    "id": "defacto-e1981axwt32",
+    "id": "defacto-h0092axwt84",
     "brandSlug": "defacto",
-    "title": "Wıde Leg Beli Lastikli Keten Karışımlı Pantolon",
-    "department": "Kadin",
-    "ageGroup": "Yetiskin",
-    "mainCategory": "Alt Giyim",
-    "subCategory": "Pantolon",
-    "productType": "Regular Fit",
-    "category": "Kadin > Alt Giyim > Pantolon",
-    "gender": "Kadın",
-    "fit": "Wıde Leg",
-    "neck": "",
-    "sleeve": "",
-    "color": "Beyaz",
-    "productCode": "E1981AXWT32",
-    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-w-de-leg-beli-lastikli-keten-kar-s-ml-pantolon-w-de-leg",
-    "image": "https://dfcdn.defacto.com.tr/376/E1981AX_26SM_BK27_01_02.jpg",
-    "price": 999.99,
-    "previousPrice": 999.99,
-    "discountRate": 0,
-    "currency": "TRY",
-    "startDate": "2026-04-12",
-    "endDate": "2026-04-19",
-    "isFeatured": false,
-    "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/wide-leg-beli-lastikli-keten-karisimli-pantolon-3423689",
-    "campaignLabel": "Liste fiyati",
-    "campaignTags": [
-      "defacto",
-      "basic",
-      "w-de-leg"
-    ],
-    "description": "",
-    "materials": [
-      {
-        "name": "Viskoz",
-        "percent": 72
-      },
-      {
-        "name": "Keten",
-        "percent": 28
-      }
-    ],
-    "materialSummary": "%72 Viskoz / %28 Keten",
-    "availability": "in-stock",
-    "searchText": "wide leg beli lastikli keten karisimli pantolon kadin yetiskin alt giyim pantolon regular fit kadin wide leg beyaz %72 viskoz / %28 keten"
-  },
-  {
-    "id": "defacto-g8831axbk81",
-    "brandSlug": "defacto",
-    "title": "Yüksek Bel Straıght Fıt Pantolon",
+    "title": "Straıght Fıt Normal Bel Gabardin Pantolon",
     "department": "Kadin",
     "ageGroup": "Yetiskin",
     "mainCategory": "Alt Giyim",
@@ -2563,10 +2638,10 @@
     "fit": "Straıght Fıt",
     "neck": "",
     "sleeve": "",
-    "color": "Siyah",
-    "productCode": "G8831AXBK81",
-    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-yuksek-bel-stra-ght-f-t-pantolon-stra-ght-f-t",
-    "image": "https://dfcdn.defacto.com.tr/376/F6214AX_26SP_BN207_01_01.jpg",
+    "color": "Beyaz",
+    "productCode": "H0092AXWT84",
+    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-stra-ght-f-t-normal-bel-gabardin-pantolon-stra-ght-f-t",
+    "image": "https://dfcdn.defacto.com.tr/376/E1981AX_26SM_WT32_01_01.jpg",
     "price": 1299.99,
     "previousPrice": 1299.99,
     "discountRate": 0,
@@ -2575,7 +2650,7 @@
     "endDate": "2026-04-19",
     "isFeatured": false,
     "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/wide-leg-pantolon-3375904",
+    "sourceUrl": "https://www.defacto.com.tr/straight-fit-normal-bel-duz-paca-gabardin-pantolon-3454457",
     "campaignLabel": "Liste fiyati",
     "campaignTags": [
       "defacto",
@@ -2585,21 +2660,57 @@
     "description": "",
     "materials": [
       {
-        "name": "Elastan",
-        "percent": 6
-      },
-      {
-        "name": "Viskoz",
-        "percent": 22
-      },
-      {
-        "name": "Poliester",
-        "percent": 72
+        "name": "Pamuk",
+        "percent": 100
       }
     ],
-    "materialSummary": "%6 Elastan / %22 Viskoz / %72 Poliester",
+    "materialSummary": "%100 Pamuk",
     "availability": "in-stock",
-    "searchText": "yuksek bel straight fit pantolon kadin yetiskin alt giyim pantolon regular fit kadin straight fit siyah %6 elastan / %22 viskoz / %72 poliester"
+    "searchText": "straight fit normal bel gabardin pantolon kadin yetiskin alt giyim pantolon regular fit kadin straight fit beyaz %100 pamuk"
+  },
+  {
+    "id": "defacto-j8738azbk27",
+    "brandSlug": "defacto",
+    "title": "Yüksek Bel Florıda Pantolon",
+    "department": "Kadin",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Alt Giyim",
+    "subCategory": "Pantolon",
+    "productType": "Regular Fit",
+    "category": "Kadin > Alt Giyim > Pantolon",
+    "gender": "Kadın",
+    "fit": "Florıda",
+    "neck": "",
+    "sleeve": "",
+    "color": "Siyah",
+    "productCode": "J8738AZBK27",
+    "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-yuksek-bel-flor-da-pantolon-flor-da",
+    "image": "https://dfcdn.defacto.com.tr/376/F6214AX_26SP_BN207_01_01.jpg",
+    "price": 799.99,
+    "previousPrice": 799.99,
+    "discountRate": 0,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": false,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/florida-florida-cepli-yuksek-bel-genis-paca-belmando-pantolon-3417555",
+    "campaignLabel": "Liste fiyati",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "flor-da"
+    ],
+    "description": "",
+    "materials": [
+      {
+        "name": "Viskoz",
+        "percent": 100
+      }
+    ],
+    "materialSummary": "%100 Viskoz",
+    "availability": "in-stock",
+    "searchText": "yuksek bel florida pantolon kadin yetiskin alt giyim pantolon regular fit kadin florida siyah %100 viskoz"
   },
   {
     "id": "defacto-f5024axbn528",
@@ -2618,7 +2729,7 @@
     "color": "Kahve",
     "productCode": "F5024AXBN528",
     "comparisonKey": "kadin-alt-giyim-pantolon-regular-fit-kad-n-pantolon-yuksek-bel-w-de-leg-pantolon-w-de-leg",
-    "image": "https://dfcdn.defacto.com.tr/376/C1428AX_26SP_AR191_01_01.jpg",
+    "image": "https://dfcdn.defacto.com.tr/376/F5024AX_26SM_BK27_01_01.jpg",
     "price": 999.99,
     "previousPrice": 999.99,
     "discountRate": 0,
@@ -3292,58 +3403,6 @@
     "searchText": "slim fit modal uzun kollu tisort kadin yetiskin ust giyim tisort basic kadin slim fit ekru %48 pamuk / %3 elastan / %49 modal"
   },
   {
-    "id": "defacto-h3013axbg801",
-    "brandSlug": "defacto",
-    "title": "Slım Fıt Yarım Balıkçı Yaka Krep Tişört",
-    "department": "Kadin",
-    "ageGroup": "Yetiskin",
-    "mainCategory": "Ust Giyim",
-    "subCategory": "Tisort",
-    "productType": "Basic",
-    "category": "Kadin > Ust Giyim > Tisort",
-    "gender": "Kadın",
-    "fit": "Slım Fıt",
-    "neck": "Yarım Balıkçı Yaka",
-    "sleeve": "Kısa Kollu",
-    "color": "Bej",
-    "productCode": "H3013AXBG801",
-    "comparisonKey": "kadin-ust-giyim-tisort-basic-kad-n-tisort-sl-m-f-t-yar-m-bal-kc-yaka-krep-tisort-sl-m-f-t-k-sa-kollu",
-    "image": "https://dfcdn.defacto.com.tr/376/H3013AX_26SM_BN558_01_01.jpg",
-    "price": 599.99,
-    "previousPrice": 599.99,
-    "discountRate": 0,
-    "currency": "TRY",
-    "startDate": "2026-04-12",
-    "endDate": "2026-04-19",
-    "isFeatured": false,
-    "sourceType": "auto-real",
-    "sourceUrl": "https://www.defacto.com.tr/slim-fit-yarim-balikci-yaka-krep-tisort-3443027",
-    "campaignLabel": "Liste fiyati",
-    "campaignTags": [
-      "defacto",
-      "basic",
-      "sl-m-f-t"
-    ],
-    "description": "",
-    "materials": [
-      {
-        "name": "Elastan",
-        "percent": 4
-      },
-      {
-        "name": "Viskoz",
-        "percent": 22
-      },
-      {
-        "name": "Poliester",
-        "percent": 74
-      }
-    ],
-    "materialSummary": "%4 Elastan / %22 Viskoz / %74 Poliester",
-    "availability": "in-stock",
-    "searchText": "slim fit yarim balikci yaka krep tisort kadin yetiskin ust giyim tisort basic kadin slim fit bej %4 elastan / %22 viskoz / %74 poliester"
-  },
-  {
     "id": "koton-6sak60009ek151",
     "brandSlug": "koton",
     "title": "Regular Fit Pamuklu Kısa Kollu Bisiklet Yaka Basic Tişört",
@@ -3380,6 +3439,45 @@
     "materialSummary": "Materyal bilgisi yok",
     "availability": "in-stock",
     "searchText": "regular fit pamuklu kisa kollu bisiklet yaka basic tisort kadin yetiskin ust giyim tisort basic kadin regular fit materyal bilgisi yok"
+  },
+  {
+    "id": "defacto-3443027",
+    "brandSlug": "defacto",
+    "title": "Slım Fıt Yarım Balıkçı Yaka Krep Tişört",
+    "department": "Kadin",
+    "ageGroup": "Yetiskin",
+    "mainCategory": "Ust Giyim",
+    "subCategory": "Tisort",
+    "productType": "Basic",
+    "category": "Kadin > Ust Giyim > Tisort",
+    "gender": "Erkek",
+    "fit": "Belirtilmedi",
+    "neck": "",
+    "sleeve": "",
+    "color": "Bej",
+    "productCode": "3443027",
+    "comparisonKey": "kadin-ust-giyim-tisort-basic-tisort-sl-m-f-t-yar-m-bal-kc-yaka-krep-tisort",
+    "image": "https://dfcdn.defacto.com.tr/376/H3013AX_26SM_BN558_01_01.jpg",
+    "price": 599.99,
+    "previousPrice": 599.99,
+    "discountRate": 0,
+    "currency": "TRY",
+    "startDate": "2026-04-12",
+    "endDate": "2026-04-19",
+    "isFeatured": false,
+    "sourceType": "auto-real",
+    "sourceUrl": "https://www.defacto.com.tr/slim-fit-yarim-balikci-yaka-krep-tisort-3443027",
+    "campaignLabel": "Liste fiyati",
+    "campaignTags": [
+      "defacto",
+      "basic",
+      "standart"
+    ],
+    "description": "",
+    "materials": [],
+    "materialSummary": "Materyal bilgisi yok",
+    "availability": "in-stock",
+    "searchText": "slim fit yarim balikci yaka krep tisort kadin yetiskin ust giyim tisort basic erkek bej materyal bilgisi yok"
   },
   {
     "id": "koton-6sak50083ek624",

@@ -1,10 +1,17 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { loadEnv } from "./lib/env.mjs";
 
 const root = process.cwd();
+loadEnv(root);
 const distDir = path.join(root, "dist");
 const siteUrl = (process.env.SITE_URL || "https://giyimkarsilastirma.com").replace(/\/$/, "");
 const assetVersion = Date.now().toString();
+const supabaseUrl = String(process.env.SUPABASE_URL || "").replace(/\/$/, "");
+const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || "");
+const productsTable = process.env.SUPABASE_PRODUCTS_TABLE || "products";
+const brandsTable = process.env.SUPABASE_BRANDS_TABLE || "brands";
+const comparisonTable = process.env.SUPABASE_COMPARISON_TABLE || "comparison_groups";
 
 const [brands, products] = await Promise.all([
   readJson("data/markets.json"),
@@ -36,7 +43,7 @@ await mkdir(path.join(distDir, "assets"), { recursive: true });
 
 await Promise.all([
   writeFile(path.join(distDir, "styles.css"), buildStyles(), "utf8"),
-  writeFile(path.join(distDir, "app.js"), buildClientScript(), "utf8"),
+  writeFile(path.join(distDir, "app.js"), buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }), "utf8"),
   writeFile(path.join(distDir, "index.html"), renderHome({ brands, validProducts, comparisonGroups, featured, departmentOptions, mainCategoryOptions, subCategoryOptions }), "utf8"),
   writeFile(path.join(distDir, "admin.html"), renderAdmin({ brands, validProducts, comparisonGroups }), "utf8"),
   writeFile(path.join(distDir, "featured.json"), JSON.stringify(featured, null, 2), "utf8"),
@@ -87,15 +94,15 @@ function renderHome({ brands, validProducts, comparisonGroups, featured, departm
         </div>
         <div class="hero-panel">
           <div class="metric-grid">
-            <article class="metric"><span>Marka</span><strong>${brands.length}</strong></article>
-            <article class="metric"><span>Urun</span><strong>${validProducts.length}</strong></article>
-            <article class="metric"><span>Grup</span><strong>${comparisonGroups.length}</strong></article>
+            <article class="metric"><span>Marka</span><strong id="metric-brand-count">${brands.length}</strong></article>
+            <article class="metric"><span>Urun</span><strong id="metric-product-count">${validProducts.length}</strong></article>
+            <article class="metric"><span>Grup</span><strong id="metric-group-count">${comparisonGroups.length}</strong></article>
           </div>
           <div class="hero-note"><strong>Kapsam</strong><p>${departmentOptions.join(", ")} · ${mainCategoryOptions.join(", ")}</p></div>
         </div>
       </section>
 
-      <section class="overview-grid">
+      <section class="overview-grid" id="overview-grid">
         ${buildCategoryOverview(validProducts)}
       </section>
 
@@ -108,13 +115,13 @@ function renderHome({ brands, validProducts, comparisonGroups, featured, departm
       </section>
 
       <section class="section" id="karsilastirmalar">
-        <div class="section-head"><div><p class="eyebrow">Karsilastirma gruplari</p><h2>Kategoriye gore benzer urunler</h2></div><small>${comparisonGroups.length} grup</small></div>
-        <div class="comparison-grid">${comparisonGroups.map(renderComparisonCard).join("")}</div>
+        <div class="section-head"><div><p class="eyebrow">Karsilastirma gruplari</p><h2>Kategoriye gore benzer urunler</h2></div><small><span id="comparison-group-count">${comparisonGroups.length}</span> grup</small></div>
+        <div class="comparison-grid" id="comparison-grid">${comparisonGroups.map(renderComparisonCard).join("")}</div>
       </section>
 
       <section class="section">
         <div class="section-head"><div><p class="eyebrow">One cikanlar</p><h2>Fiyat veya indirim dikkat ceken urunler</h2></div></div>
-        <div class="product-grid product-grid-featured">${featured.map(renderProductCard).join("")}</div>
+        <div class="product-grid product-grid-featured" id="featured-grid">${featured.map(renderProductCard).join("")}</div>
       </section>
 
       <section class="section" id="urunler">
@@ -125,9 +132,10 @@ function renderHome({ brands, validProducts, comparisonGroups, featured, departm
 
       <section class="section" id="markalar">
         <div class="section-head"><div><p class="eyebrow">Takip edilen markalar</p><h2>Kaynak havuzu</h2></div></div>
-        <div class="brand-grid">${brands.map(renderBrandCard).join("")}</div>
+        <div class="brand-grid" id="brand-grid">${brands.map(renderBrandCard).join("")}</div>
       </section>
-    </main>`
+    </main>`,
+    { page: "home" }
   );
 }
 
@@ -143,10 +151,11 @@ function renderAdmin({ brands, validProducts, comparisonGroups }) {
     `<main class="page">
       <section class="hero admin-hero">
         <div><p class="eyebrow">Yonetim paneli</p><h1>Katalog artik departman ve kategori bazli calisiyor.</h1><p class="hero-copy">Veri modeli artik Erkek, Kadin, Cocuk ile ust giyim, alt giyim ve dis giyim ayrimini destekliyor.</p></div>
-        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Marka</span><strong>${brands.length}</strong></article><article class="metric"><span>Urun</span><strong>${validProducts.length}</strong></article><article class="metric"><span>Grup</span><strong>${comparisonGroups.length}</strong></article></div></div>
+        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Marka</span><strong id="metric-brand-count">${brands.length}</strong></article><article class="metric"><span>Urun</span><strong id="metric-product-count">${validProducts.length}</strong></article><article class="metric"><span>Grup</span><strong id="metric-group-count">${comparisonGroups.length}</strong></article></div></div>
       </section>
-      <section class="section"><div class="table-wrap"><table><thead><tr><th>Marka</th><th>Urun</th><th>Departman</th><th>En iyi fiyat grubu</th></tr></thead><tbody>${brandRows}</tbody></table></div></section>
-    </main>`
+      <section class="section"><div class="table-wrap"><table><thead><tr><th>Marka</th><th>Urun</th><th>Departman</th><th>En iyi fiyat grubu</th></tr></thead><tbody id="admin-brand-rows">${brandRows}</tbody></table></div></section>
+    </main>`,
+    { page: "admin" }
   );
 }
 
@@ -157,10 +166,11 @@ function renderBrandPage({ brand, items }) {
     `<main class="page">
       <section class="hero brand-hero">
         <div><p class="eyebrow">${escapeHtml(brand.segment || "Marka")}</p><h1>${escapeHtml(brand.name)} urun akisiniz</h1><p class="hero-copy">Bu marka icin kategori bazli urun ve fiyat akisi burada listeleniyor.</p><div class="hero-actions"><a class="button primary" href="/">Ana sayfaya don</a><a class="button" href="${escapeHtml(brand.website)}">Resmi site</a></div></div>
-        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Urun</span><strong>${items.length}</strong></article><article class="metric"><span>Departman</span><strong class="metric-small">${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(", ") || "-")}</strong></article><article class="metric"><span>Ana kategori</span><strong class="metric-small">${escapeHtml(uniqueOptions(items.map((item) => item.mainCategory)).join(", ") || "-")}</strong></article></div></div>
+        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Urun</span><strong id="brand-product-count">${items.length}</strong></article><article class="metric"><span>Departman</span><strong class="metric-small" id="brand-departments">${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(", ") || "-")}</strong></article><article class="metric"><span>Ana kategori</span><strong class="metric-small" id="brand-main-categories">${escapeHtml(uniqueOptions(items.map((item) => item.mainCategory)).join(", ") || "-")}</strong></article></div></div>
       </section>
-      <section class="section"><div class="product-grid">${items.map(renderProductCard).join("") || `<div class="empty">Bu marka icin henuz urun yok.</div>`}</div></section>
-    </main>`
+      <section class="section"><div class="product-grid" id="brand-product-grid">${items.map(renderProductCard).join("") || `<div class="empty">Bu marka icin henuz urun yok.</div>`}</div></section>
+    </main>`,
+    { page: "brand", brandSlug: brand.slug }
   );
 }
 
@@ -211,7 +221,17 @@ function makeReadableLabel(value) {
   return String(value).split("-").filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1)).join(" ");
 }
 
-function layout(title, description, content) {
+function layout(title, description, content, options = {}) {
+  const appConfig = {
+    page: options.page || "home",
+    brandSlug: options.brandSlug || "",
+    supabaseUrl,
+    supabaseAnonKey,
+    productsTable,
+    brandsTable,
+    comparisonTable,
+  };
+
   return `<!doctype html>
 <html lang="tr">
 <head>
@@ -224,8 +244,9 @@ function layout(title, description, content) {
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css?v=${assetVersion}">
 </head>
-<body>
+<body data-page="${escapeHtml(appConfig.page)}" data-brand-slug="${escapeHtml(appConfig.brandSlug)}">
   ${content}
+  <script>window.__APP_CONFIG__=${serializeForScript(appConfig)};</script>
   <script src="/app.js?v=${assetVersion}"></script>
 </body>
 </html>`;
@@ -267,6 +288,210 @@ function buildClientScript() {
   departmentFilter.addEventListener('change', applyFilters);
   mainCategoryFilter.addEventListener('change', applyFilters);
   subCategoryFilter.addEventListener('change', applyFilters);
+})();`;
+}
+
+function buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }) {
+  const clientConfig = JSON.stringify({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }).replace(/</g, "\\u003c");
+  return `(() => {
+  const config = Object.assign(${clientConfig}, window.__APP_CONFIG__ || {});
+  const page = document.body.dataset.page || config.page || 'home';
+  const currentBrandSlug = document.body.dataset.brandSlug || config.brandSlug || '';
+  const normalize = (value) => String(value || '').toLocaleLowerCase('tr-TR').replace(/[Ä±ı]/g, 'i').replace(/[ÄŸğ]/g, 'g').replace(/[Ã¼ü]/g, 'u').replace(/[ÅŸş]/g, 's').replace(/[Ã¶ö]/g, 'o').replace(/[Ã§ç]/g, 'c').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();
+  const slugify = (value) => normalize(value).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const escapeHtml = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  const formatPrice = (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(Number(value) || 0);
+  const uniqueOptions = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+  const makeReadableLabel = (value) => String(value || '').split('-').filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase('tr-TR') + part.slice(1)).join(' ');
+
+  const mapBrand = (row) => ({ slug: row.slug, name: row.name, color: row.color || '#111827', website: row.website || '#', segment: row.segment || '' });
+  const mapProduct = (row, brandMap) => {
+    const brandSlug = row.brandSlug || row.brand_slug || '';
+    return {
+      id: row.id,
+      brandSlug,
+      title: row.title || '',
+      department: row.department || '',
+      mainCategory: row.mainCategory || row.main_category || '',
+      subCategory: row.subCategory || row.sub_category || '',
+      productType: row.productType || row.product_type || '',
+      category: row.category || '',
+      gender: row.gender || '',
+      fit: row.fit || '',
+      color: row.color || '',
+      productCode: row.productCode || row.product_code || '',
+      comparisonKey: row.comparisonKey || row.comparison_key || row.id,
+      image: row.image || '',
+      price: Number(row.price) || 0,
+      previousPrice: Number(row.previousPrice || row.previous_price) || Number(row.price) || 0,
+      discountRate: Number(row.discountRate || row.discount_rate) || 0,
+      sourceUrl: row.sourceUrl || row.source_url || '',
+      materialSummary: row.materialSummary || row.material_summary || 'Materyal bilgisi yok',
+      searchText: normalize(row.searchText || row.search_text || [row.title, row.department, row.mainCategory, row.subCategory, row.productType, row.color].join(' ')),
+      brand: brandMap.get(brandSlug) || { slug: brandSlug, name: brandSlug || 'Marka', color: '#111827', website: '#', segment: '' },
+    };
+  };
+
+  const renderBrandCard = (brand) => \`<a class="brand-card" href="/brand/\${brand.slug}/" style="--brand:\${escapeHtml(brand.color)}"><span class="brand-dot"></span><strong>\${escapeHtml(brand.name)}</strong><small>\${escapeHtml(brand.segment || '')}</small></a>\`;
+  const renderProductCard = (item) => \`<article class="product-card" data-search="\${escapeHtml(item.searchText)}" data-brand="\${escapeHtml(item.brandSlug)}" data-department="\${escapeHtml(slugify(item.department))}" data-main-category="\${escapeHtml(slugify(item.mainCategory))}" data-sub-category="\${escapeHtml(slugify(item.subCategory))}"><img src="\${escapeHtml(item.image)}" alt="\${escapeHtml(item.title)}"><div class="product-body"><div class="badge-row"><span class="badge" style="background:\${escapeHtml(item.brand.color)}14;color:\${escapeHtml(item.brand.color)}">\${escapeHtml(item.brand.name)}</span><span class="badge">\${escapeHtml(item.department)}</span><span class="badge">\${escapeHtml(item.mainCategory)}</span>\${item.discountRate > 0 ? \`<span class="badge accent">%\${item.discountRate} indirim</span>\` : ''}</div><h3>\${escapeHtml(item.title)}</h3><p>\${escapeHtml(item.subCategory)} · \${escapeHtml(item.productType || item.fit)} · \${escapeHtml(item.gender)}</p><div class="price-row"><strong>\${formatPrice(item.price)}</strong>\${item.previousPrice > item.price ? \`<s>\${formatPrice(item.previousPrice)}</s>\` : ''}</div><div class="meta-stack"><small><strong>Taksonomi:</strong> \${escapeHtml(item.category)}</small><small><strong>Materyal:</strong> \${escapeHtml(item.materialSummary)}</small><small><strong>Urun kodu:</strong> \${escapeHtml(item.productCode || '-')}</small></div>\${item.sourceUrl ? \`<a class="source-link" href="\${escapeHtml(item.sourceUrl)}">Kaynak urune git</a>\` : ''}</div></article>\`;
+  const renderComparisonCard = (group) => \`<article class="comparison-card"><div class="section-head tight"><div><p class="eyebrow">\${escapeHtml(group.department)}</p><h3>\${escapeHtml(group.label)}</h3></div><small>\${group.items.length} marka</small></div><p class="compare-meta">\${escapeHtml(group.mainCategory)} · \${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>\${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">\${group.items.map((item, index) => \`<div class="compare-row \${index === 0 ? 'winner' : ''}"><strong>\${escapeHtml(item.brand.name)}</strong><span>\${formatPrice(item.price)}</span><small>\${escapeHtml(item.materialSummary)}</small></div>\`).join('')}</div></article>\`;
+
+  const buildCategoryOverview = (items) => {
+    const departments = new Map();
+    for (const item of items) {
+      if (!departments.has(item.department)) departments.set(item.department, new Map());
+      const mainMap = departments.get(item.department);
+      if (!mainMap.has(item.mainCategory)) mainMap.set(item.mainCategory, 0);
+      mainMap.set(item.mainCategory, mainMap.get(item.mainCategory) + 1);
+    }
+    return [...departments.entries()].map(([department, mainMap]) => \`<article class="overview-card"><p class="eyebrow">\${escapeHtml(department)}</p><h3>\${escapeHtml(department)} katalogu</h3><div class="overview-list">\${[...mainMap.entries()].map(([mainCategory, count]) => \`<div class="overview-row"><strong>\${escapeHtml(mainCategory)}</strong><span>\${count} urun</span></div>\`).join('')}</div></article>\`).join('');
+  };
+
+  const fillSelect = (element, values, placeholder) => {
+    if (!element) return;
+    const current = element.value;
+    element.innerHTML = \`<option value="">\${placeholder}</option>\${values.map((value) => \`<option value="\${escapeHtml(slugify(value))}">\${escapeHtml(value)}</option>\`).join('')}\`;
+    if ([...element.options].some((option) => option.value === current)) element.value = current;
+  };
+
+  async function fetchRows(table, query) {
+    const response = await fetch(\`\${config.supabaseUrl}/rest/v1/\${table}?\${query}\`, {
+      headers: { apikey: config.supabaseAnonKey, Authorization: \`Bearer \${config.supabaseAnonKey}\` },
+    });
+    if (!response.ok) throw new Error(\`\${table} \${response.status}\`);
+    return response.json();
+  }
+
+  async function fetchCatalog() {
+    const [brandRows, productRows, comparisonRows] = await Promise.all([
+      fetchRows(config.brandsTable, 'select=slug,name,color,website,segment,priority,branches'),
+      fetchRows(config.productsTable, 'select=*&order=price.asc&limit=1000'),
+      fetchRows(config.comparisonTable, 'select=*&order=lowest_price.asc&limit=1000'),
+    ]);
+    const brands = brandRows.map(mapBrand);
+    const brandMap = new Map(brands.map((brand) => [brand.slug, brand]));
+    const products = productRows.map((row) => mapProduct(row, brandMap)).sort((a, b) => a.price - b.price);
+    const comparisonGroups = comparisonRows.map((row) => {
+      const items = Array.isArray(row.items) ? row.items.map((item) => mapProduct(item, brandMap)).sort((a, b) => a.price - b.price) : [];
+      return { comparisonKey: row.comparison_key || row.id, label: makeReadableLabel(row.comparison_key || row.id), department: items[0]?.department || 'Diger', mainCategory: items[0]?.mainCategory || 'Diger', subCategory: items[0]?.subCategory || 'Diger', items, bestPrice: items[0] || null };
+    });
+    return { brands, products, comparisonGroups };
+  }
+
+  function attachFilters() {
+    const searchInput = document.getElementById('search');
+    const brandFilter = document.getElementById('brand-filter');
+    const departmentFilter = document.getElementById('department-filter');
+    const mainCategoryFilter = document.getElementById('main-category-filter');
+    const subCategoryFilter = document.getElementById('sub-category-filter');
+    const resultCount = document.getElementById('result-count');
+    const emptyState = document.getElementById('empty-state');
+    if (!searchInput || !brandFilter || !departmentFilter || !mainCategoryFilter || !subCategoryFilter || !resultCount || !emptyState) return;
+    const applyFilters = () => {
+      const cards = [...document.querySelectorAll('#product-grid .product-card')];
+      const search = normalize(searchInput.value);
+      const brand = brandFilter.value;
+      const department = departmentFilter.value;
+      const mainCategory = mainCategoryFilter.value;
+      const subCategory = subCategoryFilter.value;
+      let visible = 0;
+      for (const card of cards) {
+        const show = (!search || (card.dataset.search || '').includes(search))
+          && (!brand || card.dataset.brand === brand)
+          && (!department || card.dataset.department === department)
+          && (!mainCategory || card.dataset.mainCategory === mainCategory)
+          && (!subCategory || card.dataset.subCategory === subCategory);
+        card.hidden = !show;
+        if (show) visible += 1;
+      }
+      resultCount.textContent = String(visible);
+      emptyState.classList.toggle('hidden', visible !== 0);
+    };
+    searchInput.oninput = applyFilters;
+    brandFilter.onchange = applyFilters;
+    departmentFilter.onchange = applyFilters;
+    mainCategoryFilter.onchange = applyFilters;
+    subCategoryFilter.onchange = applyFilters;
+    applyFilters();
+  }
+
+  function renderHome(data) {
+    const featured = data.products.slice().sort((a, b) => (b.discountRate - a.discountRate) || (a.price - b.price)).slice(0, 8);
+    const departments = uniqueOptions(data.products.map((item) => item.department));
+    const mainCategories = uniqueOptions(data.products.map((item) => item.mainCategory));
+    const subCategories = uniqueOptions(data.products.map((item) => item.subCategory));
+    const metricBrand = document.getElementById('metric-brand-count');
+    const metricProduct = document.getElementById('metric-product-count');
+    const metricGroup = document.getElementById('metric-group-count');
+    const groupCount = document.getElementById('comparison-group-count');
+    if (metricBrand) metricBrand.textContent = String(data.brands.length);
+    if (metricProduct) metricProduct.textContent = String(data.products.length);
+    if (metricGroup) metricGroup.textContent = String(data.comparisonGroups.length);
+    if (groupCount) groupCount.textContent = String(data.comparisonGroups.length);
+    const overview = document.getElementById('overview-grid');
+    if (overview) overview.innerHTML = buildCategoryOverview(data.products);
+    const comparisonGrid = document.getElementById('comparison-grid');
+    if (comparisonGrid) comparisonGrid.innerHTML = data.comparisonGroups.map(renderComparisonCard).join('');
+    const featuredGrid = document.getElementById('featured-grid');
+    if (featuredGrid) featuredGrid.innerHTML = featured.map(renderProductCard).join('');
+    const productGrid = document.getElementById('product-grid');
+    if (productGrid) productGrid.innerHTML = data.products.map(renderProductCard).join('');
+    const brandGrid = document.getElementById('brand-grid');
+    if (brandGrid) brandGrid.innerHTML = data.brands.map(renderBrandCard).join('');
+    fillSelect(document.getElementById('department-filter'), departments, 'Tum departmanlar');
+    fillSelect(document.getElementById('main-category-filter'), mainCategories, 'Tum ana kategoriler');
+    fillSelect(document.getElementById('sub-category-filter'), subCategories, 'Tum alt kategoriler');
+    const brandFilter = document.getElementById('brand-filter');
+    if (brandFilter) {
+      const current = brandFilter.value;
+      brandFilter.innerHTML = \`<option value="">Tum markalar</option>\${data.brands.map((brand) => \`<option value="\${escapeHtml(brand.slug)}">\${escapeHtml(brand.name)}</option>\`).join('')}\`;
+      if ([...brandFilter.options].some((option) => option.value === current)) brandFilter.value = current;
+    }
+    attachFilters();
+  }
+
+  function renderAdmin(data) {
+    const metricBrand = document.getElementById('metric-brand-count');
+    const metricProduct = document.getElementById('metric-product-count');
+    const metricGroup = document.getElementById('metric-group-count');
+    if (metricBrand) metricBrand.textContent = String(data.brands.length);
+    if (metricProduct) metricProduct.textContent = String(data.products.length);
+    if (metricGroup) metricGroup.textContent = String(data.comparisonGroups.length);
+    const tbody = document.getElementById('admin-brand-rows');
+    if (!tbody) return;
+    tbody.innerHTML = data.brands.map((brand) => {
+      const items = data.products.filter((item) => item.brandSlug === brand.slug);
+      const best = data.comparisonGroups.filter((group) => group.bestPrice?.brandSlug === brand.slug).length;
+      return \`<tr><td>\${escapeHtml(brand.name)}</td><td>\${items.length}</td><td>\${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(', ') || '-')}</td><td>\${best}</td></tr>\`;
+    }).join('');
+  }
+
+  function renderBrandPage(data) {
+    const brandProducts = data.products.filter((item) => item.brandSlug === currentBrandSlug);
+    const count = document.getElementById('brand-product-count');
+    const departments = document.getElementById('brand-departments');
+    const mainCategories = document.getElementById('brand-main-categories');
+    const grid = document.getElementById('brand-product-grid');
+    if (count) count.textContent = String(brandProducts.length);
+    if (departments) departments.textContent = uniqueOptions(brandProducts.map((item) => item.department)).join(', ') || '-';
+    if (mainCategories) mainCategories.textContent = uniqueOptions(brandProducts.map((item) => item.mainCategory)).join(', ') || '-';
+    if (grid) grid.innerHTML = brandProducts.map(renderProductCard).join('') || '<div class="empty">Bu marka icin henuz urun yok.</div>';
+  }
+
+  async function init() {
+    attachFilters();
+    if (!config.supabaseUrl || !config.supabaseAnonKey) return;
+    try {
+      const data = await fetchCatalog();
+      if (page === 'admin') renderAdmin(data);
+      else if (page === 'brand') renderBrandPage(data);
+      else renderHome(data);
+    } catch (error) {
+      console.error('Supabase live mode fallback used:', error);
+    }
+  }
+
+  init();
 })();`;
 }
 
@@ -369,4 +594,8 @@ function slugify(value) {
 
 function escapeHtml(value) {
   return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
+function serializeForScript(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
 }
