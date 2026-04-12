@@ -1,0 +1,160 @@
+{
+  "generatedAt": "2026-04-05T15:38:04.795Z",
+  "sourceCount": 61,
+  "channels": {
+    "x": {
+      "morning": {
+        "title": "Sabah paylaşımı",
+        "body": "Sabah fırsat radarı\nGüne öne çıkan aktüel ürünlerle başlayın:\n1. Migros: Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı - ₺189,95 (%47)\n2. Migros: Süper Maylo Bambu Katkılı Tuvalet Kagıdı 40'lı - ₺279,95 (%46)\n3. Migros: Superfresh Ispanak 450 G - ₺62,97 (%30)\n\nDetaylar: https://aktüelkarsilastirma.com\n#aktüel #indirim #marketfırsatları",
+        "card": {
+          "market": "Migros",
+          "marketColor": "#f97316",
+          "title": "Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı",
+          "price": 189.95,
+          "previousPrice": 359.95,
+          "discountRate": 47,
+          "category": "Rulo Havlu Peçete",
+          "image": "https://images.migrosone.com/sanalmarket/product/31020084/31020084_1-52a106.jpg",
+          "kicker": "Sabah fırsat radarı"
+        }
+      },
+      "evening": {
+        "title": "Akşam paylaşımı",
+        "body": "Akşam market özeti\nAkşam öne çıkan market fırsatları:\n1. A101: Ornek Urun - ₺29,95 (%25)\n2. Migros: Erikli Su 6 X 1 L - ₺119,00 (%24)\n3. Migros: Ünal Dilimli Klasik Beyaz Peynir 450 G - ₺289,90 (%24)\n\nDetaylar: https://aktüelkarsilastirma.com\n#aktüel #indirim #marketfırsatları",
+        "card": {
+          "market": "A101",
+          "marketColor": "#1d4ed8",
+          "title": "Ornek Urun",
+          "price": 29.95,
+          "previousPrice": 39.95,
+          "discountRate": 25,
+          "category": "Atistirmalik",
+          "image": "https://images.unsplash.com/photo-1570829460005-c840387bb1ca?auto=format&fit=crop&w=900&q=80",
+          "kicker": "Akşam market özeti"
+        }
+      }
+    },
+    "telegram": {
+      "channel": "telegram",
+      "type": "message",
+      "title": "Telegram kanal özeti",
+      "body": "Bugünün takip edilen market fırsatları:\n• Migros | Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı\n  ₺189,95 yerine ₺359,95 | %47\n• Migros | Süper Maylo Bambu Katkılı Tuvalet Kagıdı 40'lı\n  ₺279,95 yerine ₺519,95 | %46\n• Migros | Superfresh Ispanak 450 G\n  ₺62,97 yerine ₺89,95 | %30\n• A101 | Ornek Urun\n  ₺29,95 yerine ₺39,95 | %25\n• Migros | Erikli Su 6 X 1 L\n  ₺119,00 yerine ₺157,50 | %24\n\nSite: https://xn--aktelkarsilastirma-o6b.com"
+    },
+    "instagram": {
+      "cards": [
+        {
+          "id": "ig-single",
+          "template": "single",
+          "templateLabel": "Tek ürün fırsatı",
+          "title": "Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı",
+          "market": "Migros",
+          "discountRate": 47,
+          "price": 189.95,
+          "previousPrice": 359.95,
+          "category": "Rulo Havlu Peçete",
+          "image": "https://images.migrosone.com/sanalmarket/product/31020084/31020084_1-52a106.jpg",
+          "theme": "#f97316",
+          "caption": "Migros marketinde Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı şimdi ₺189,95. İndirim oranı %47."
+        },
+        {
+          "id": "ig-comparison",
+          "template": "comparison",
+          "templateLabel": "Market karşılaştırma",
+          "title": "Migros vs A101 vs Carrefoursa",
+          "items": [
+            {
+              "market": "Migros",
+              "price": 189.95,
+              "discountRate": 47,
+              "color": "#f97316",
+              "title": "Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı"
+            },
+            {
+              "market": "A101",
+              "price": 29.95,
+              "discountRate": 25,
+              "color": "#1d4ed8",
+              "title": "Ornek Urun"
+            },
+            {
+              "market": "Carrefoursa",
+              "price": 249.9,
+              "discountRate": 22,
+              "color": "#2563eb",
+              "title": "Riviera Zeytinyagi 2 L"
+            }
+          ],
+          "highlight": "Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı",
+          "caption": "Migros, A101, Carrefoursa marketleri arasında fiyat/indirim karşılaştırması."
+        },
+        {
+          "id": "ig-roundup",
+          "template": "roundup",
+          "templateLabel": "Haftanın 5 fırsatı",
+          "title": "Haftanın öne çıkanları",
+          "items": [
+            {
+              "market": "Migros",
+              "title": "Süper Maylo Bambu Katkılı Kağıt Havlu 16'lı",
+              "price": 189.95,
+              "discountRate": 47,
+              "color": "#f97316"
+            },
+            {
+              "market": "Migros",
+              "title": "Süper Maylo Bambu Katkılı Tuvalet Kagıdı 40'lı",
+              "price": 279.95,
+              "discountRate": 46,
+              "color": "#f97316"
+            },
+            {
+              "market": "Migros",
+              "title": "Superfresh Ispanak 450 G",
+              "price": 62.97,
+              "discountRate": 30,
+              "color": "#f97316"
+            },
+            {
+              "market": "A101",
+              "title": "Ornek Urun",
+              "price": 29.95,
+              "discountRate": 25,
+              "color": "#1d4ed8"
+            },
+            {
+              "market": "Migros",
+              "title": "Erikli Su 6 X 1 L",
+              "price": 119,
+              "discountRate": 24,
+              "color": "#f97316"
+            }
+          ],
+          "caption": "Bu hafta için öne çıkan 5 market fırsatı tek karede toplandı."
+        }
+      ],
+      "formats": [
+        {
+          "id": "ig-story",
+          "label": "Instagram Story",
+          "file": "instagram-story.svg",
+          "caption": "Story için hazır. Migros fırsatı ₺189,95 fiyatla öne çıkıyor.",
+          "note": "Sabah ya da akşam story paylaşımı için dikey format."
+        },
+        {
+          "id": "ig-post",
+          "label": "Instagram Post",
+          "file": "instagram-post.svg",
+          "caption": "Migros, A101, Carrefoursa marketleri için post formatında özet karşılaştırma.",
+          "note": "Feed gönderisi için uygun 4:5 format."
+        },
+        {
+          "id": "ig-reel-cover",
+          "label": "Reel Kapağı",
+          "file": "instagram-reel-cover.svg",
+          "caption": "Reel kapağı için haftanın öne çıkan fırsatları hazır.",
+          "note": "Reel kapak görseli ya da kısa video kapağı olarak kullanılabilir."
+        }
+      ]
+    }
+  }
+}

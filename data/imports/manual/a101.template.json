@@ -1,0 +1,14 @@
+[
+  {
+    "marketSlug": "a101",
+    "title": "A101 urun adini buraya yazin",
+    "category": "Temel Gida",
+    "image": "https://gorsel-linki-buraya-gelin.jpg",
+    "price": 0,
+    "previousPrice": 0,
+    "startDate": "2026-04-05",
+    "endDate": "2026-04-12",
+    "sourceType": "manual",
+    "sourceUrl": "https://www.a101.com.tr/aldin-aldin"
+  }
+]

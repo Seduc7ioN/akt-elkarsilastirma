@@ -1,0 +1,18 @@
+{
+  "name": "giyim-karsilastirma",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
+    "build": "node scripts/build.mjs",
+    "build:site": "node scripts/build.mjs",
+    "import": "node scripts/import-campaigns.mjs",
+    "pipeline": "npm run sync && npm run import && npm run build && npm run supabase:sync",
+    "pipeline:publish": "npm run pipeline && npm run deploy:ftp",
+    "dev": "node scripts/dev.mjs",
+    "sync": "node scripts/sync-campaigns.mjs",
+    "supabase:sync": "node scripts/supabase-sync.mjs",
+    "deploy:ftp": "powershell -ExecutionPolicy Bypass -File scripts/deploy-ftp.ps1"
+  }
+}

@@ -1,0 +1,50 @@
+name: Catalog Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_site:
+        description: "Build sonrasi FTP deploy yap"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  pipeline:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create env file
+        shell: pwsh
+        run: |
+          @"
+          SITE_URL=${{ secrets.SITE_URL }}
+          FTP_HOST=${{ secrets.FTP_HOST }}
+          FTP_USER=${{ secrets.FTP_USER }}
+          FTP_PASSWORD=${{ secrets.FTP_PASSWORD }}
+          FTP_REMOTE_DIR=${{ secrets.FTP_REMOTE_DIR }}
+          SYNC_USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_PRODUCTS_TABLE=${{ secrets.SUPABASE_PRODUCTS_TABLE || 'products' }}
+          SUPABASE_BRANDS_TABLE=${{ secrets.SUPABASE_BRANDS_TABLE || 'brands' }}
+          SUPABASE_COMPARISON_TABLE=${{ secrets.SUPABASE_COMPARISON_TABLE || 'comparison_groups' }}
+          "@ | Set-Content -Path .env
+
+      - name: Run catalog pipeline
+        shell: pwsh
+        run: npm.cmd run pipeline
+
+      - name: Deploy site
+        if: ${{ inputs.deploy_site }}
+        shell: pwsh
+        run: npm.cmd run deploy:ftp
