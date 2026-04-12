@@ -132,17 +132,17 @@ function renderHome({ brands, validProducts, comparisonGroups, featured, departm
 
       <section class="section" id="karsilastirmalar">
         <div class="section-head"><div><p class="eyebrow">Karsilastirma gruplari</p><h2>Kategoriye gore benzer urunler</h2></div><small><span id="comparison-group-count">${comparisonGroups.length}</span> grup</small></div>
-        <div class="comparison-grid" id="comparison-grid">${comparisonGroups.map(renderComparisonCard).join("")}</div>
+        <div class="comparison-grid" id="comparison-grid">${comparisonGroups.map(renderComparisonCardPremium).join("")}</div>
       </section>
 
       <section class="section">
         <div class="section-head"><div><p class="eyebrow">One cikanlar</p><h2>Fiyat veya indirim dikkat ceken urunler</h2></div></div>
-        <div class="product-grid product-grid-featured" id="featured-grid">${featured.map(renderProductCard).join("")}</div>
+        <div class="product-grid product-grid-featured" id="featured-grid">${featured.map(renderProductCardPremium).join("")}</div>
       </section>
 
       <section class="section" id="urunler">
         <div class="section-head"><div><p class="eyebrow">Tum urunler</p><h2>Kategori bazli katalog akisi</h2></div><small><strong id="result-count">${validProducts.length}</strong> kayit</small></div>
-        <div class="product-grid" id="product-grid">${validProducts.map(renderProductCard).join("")}</div>
+        <div class="product-grid" id="product-grid">${validProducts.map(renderProductCardPremium).join("")}</div>
         <div class="empty hidden" id="empty-state">Filtrelere uygun urun bulunamadi.</div>
       </section>
 
@@ -184,7 +184,7 @@ function renderBrandPage({ brand, items }) {
         <div><p class="eyebrow">${escapeHtml(brand.segment || "Marka")}</p><h1>${escapeHtml(brand.name)} urun akisiniz</h1><p class="hero-copy">Bu marka icin kategori bazli urun ve fiyat akisi burada listeleniyor.</p><div class="hero-actions"><a class="button primary" href="/">Ana sayfaya don</a><a class="button" href="${escapeHtml(brand.website)}">Resmi site</a></div></div>
         <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Urun</span><strong id="brand-product-count">${items.length}</strong></article><article class="metric"><span>Departman</span><strong class="metric-small" id="brand-departments">${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(", ") || "-")}</strong></article><article class="metric"><span>Ana kategori</span><strong class="metric-small" id="brand-main-categories">${escapeHtml(uniqueOptions(items.map((item) => item.mainCategory)).join(", ") || "-")}</strong></article></div></div>
       </section>
-      <section class="section"><div class="product-grid" id="brand-product-grid">${items.map(renderProductCard).join("") || `<div class="empty">Bu marka icin henuz urun yok.</div>`}</div></section>
+      <section class="section"><div class="product-grid" id="brand-product-grid">${items.map(renderProductCardPremium).join("") || `<div class="empty">Bu marka icin henuz urun yok.</div>`}</div></section>
     </main>`,
     { page: "brand", brandSlug: brand.slug }
   );
@@ -194,12 +194,20 @@ function renderBrandCard(brand) {
   return `<a class="brand-card" href="/brand/${brand.slug}/" style="--brand:${escapeHtml(brand.color)}"><span class="brand-dot"></span><strong>${escapeHtml(brand.name)}</strong><small>${escapeHtml(brand.segment || "")}</small></a>`;
 }
 
-function renderComparisonCard(group) {
+function renderComparisonCardPremium(group) {
   return `<article class="comparison-card"><div class="section-head tight"><div><p class="eyebrow">${escapeHtml(group.department)}</p><h3>${escapeHtml(group.label)}</h3></div><small>${group.items.length} marka</small></div><p class="compare-meta">${escapeHtml(group.mainCategory)} · ${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">${group.items.map((item, index) => `<div class="compare-row ${index === 0 ? "winner" : ""}"><strong>${escapeHtml(item.brand.name)}</strong><span>${formatPrice(item.price)}</span><small>${escapeHtml(item.materialSummary)}</small></div>`).join("")}</div></article>`;
 }
 
-function renderProductCard(item) {
+function renderProductCardPremium(item) {
   return `<article class="product-card" data-search="${escapeHtml(item.searchText)}" data-brand="${escapeHtml(item.brandSlug)}" data-department="${escapeHtml(slugify(item.department))}" data-main-category="${escapeHtml(slugify(item.mainCategory))}" data-sub-category="${escapeHtml(slugify(item.subCategory))}"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}"><div class="product-body"><div class="badge-row"><span class="badge" style="background:${escapeHtml(item.brand.color)}14;color:${escapeHtml(item.brand.color)}">${escapeHtml(item.brand.name)}</span><span class="badge">${escapeHtml(item.department)}</span><span class="badge">${escapeHtml(item.mainCategory)}</span>${item.discountRate > 0 ? `<span class="badge accent">%${item.discountRate} indirim</span>` : ""}</div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.subCategory)} · ${escapeHtml(item.productType || item.fit)} · ${escapeHtml(item.gender)}</p><div class="price-row"><strong>${formatPrice(item.price)}</strong>${item.previousPrice > item.price ? `<s>${formatPrice(item.previousPrice)}</s>` : ""}</div><div class="meta-stack"><small><strong>Taksonomi:</strong> ${escapeHtml(item.category)}</small><small><strong>Materyal:</strong> ${escapeHtml(item.materialSummary)}</small><small><strong>Urun kodu:</strong> ${escapeHtml(item.productCode || "-")}</small></div>${item.sourceUrl ? `<a class="source-link" href="${escapeHtml(item.sourceUrl)}">Kaynak urune git</a>` : ""}</div></article>`;
+}
+
+function renderComparisonCard(group) {
+  return `<article class="comparison-card"><div class="compare-card-top"><div><p class="eyebrow">${escapeHtml(group.department)}</p><h3>${escapeHtml(group.label)}</h3></div><span class="compare-chip">${group.items.length} marka</span></div><p class="compare-meta">${escapeHtml(group.mainCategory)} · ${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">${group.items.map((item, index) => `<div class="compare-row ${index === 0 ? "winner" : ""}"><div class="compare-row-main"><span class="compare-rank">${index + 1}</span><div><strong>${escapeHtml(item.brand.name)}</strong><small>${escapeHtml(item.materialSummary)}</small></div></div><div class="compare-row-side"><span>${formatPrice(item.price)}</span><small>${escapeHtml(item.productType || item.fit || item.subCategory)}</small></div></div>`).join("")}</div></article>`;
+}
+
+function renderProductCard(item) {
+  return `<article class="product-card" data-search="${escapeHtml(item.searchText)}" data-brand="${escapeHtml(item.brandSlug)}" data-department="${escapeHtml(slugify(item.department))}" data-main-category="${escapeHtml(slugify(item.mainCategory))}" data-sub-category="${escapeHtml(slugify(item.subCategory))}"><div class="product-media"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}"><div class="product-overlay"><span class="overlay-brand" style="background:${escapeHtml(item.brand.color)}">${escapeHtml(item.brand.name)}</span>${item.discountRate > 0 ? `<span class="overlay-sale">%${item.discountRate}</span>` : ""}</div></div><div class="product-body"><div class="badge-row"><span class="badge">${escapeHtml(item.department)}</span><span class="badge">${escapeHtml(item.mainCategory)}</span><span class="badge">${escapeHtml(item.subCategory)}</span></div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.productType || item.fit || item.subCategory)} · ${escapeHtml(item.gender || "Genel koleksiyon")}</p><div class="price-row"><strong>${formatPrice(item.price)}</strong>${item.previousPrice > item.price ? `<s>${formatPrice(item.previousPrice)}</s>` : ""}</div><div class="material-panel"><span>Materyal</span><strong>${escapeHtml(item.materialSummary)}</strong></div><div class="meta-stack"><small><strong>Taksonomi:</strong> ${escapeHtml(item.category)}</small><small><strong>Urun kodu:</strong> ${escapeHtml(item.productCode || "-")}</small></div><div class="card-footer"><span class="product-signature">${escapeHtml(item.brand.name)} secimi</span>${item.sourceUrl ? `<a class="source-link" href="${escapeHtml(item.sourceUrl)}">Urunu ac</a>` : ""}</div></div></article>`;
 }
 
 function buildComparisonGroups(items) {
@@ -352,6 +360,9 @@ function buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, br
   const renderProductCard = (item) => \`<article class="product-card" data-search="\${escapeHtml(item.searchText)}" data-brand="\${escapeHtml(item.brandSlug)}" data-department="\${escapeHtml(slugify(item.department))}" data-main-category="\${escapeHtml(slugify(item.mainCategory))}" data-sub-category="\${escapeHtml(slugify(item.subCategory))}"><img src="\${escapeHtml(item.image)}" alt="\${escapeHtml(item.title)}"><div class="product-body"><div class="badge-row"><span class="badge" style="background:\${escapeHtml(item.brand.color)}14;color:\${escapeHtml(item.brand.color)}">\${escapeHtml(item.brand.name)}</span><span class="badge">\${escapeHtml(item.department)}</span><span class="badge">\${escapeHtml(item.mainCategory)}</span>\${item.discountRate > 0 ? \`<span class="badge accent">%\${item.discountRate} indirim</span>\` : ''}</div><h3>\${escapeHtml(item.title)}</h3><p>\${escapeHtml(item.subCategory)} · \${escapeHtml(item.productType || item.fit)} · \${escapeHtml(item.gender)}</p><div class="price-row"><strong>\${formatPrice(item.price)}</strong>\${item.previousPrice > item.price ? \`<s>\${formatPrice(item.previousPrice)}</s>\` : ''}</div><div class="meta-stack"><small><strong>Taksonomi:</strong> \${escapeHtml(item.category)}</small><small><strong>Materyal:</strong> \${escapeHtml(item.materialSummary)}</small><small><strong>Urun kodu:</strong> \${escapeHtml(item.productCode || '-')}</small></div>\${item.sourceUrl ? \`<a class="source-link" href="\${escapeHtml(item.sourceUrl)}">Kaynak urune git</a>\` : ''}</div></article>\`;
   const renderComparisonCard = (group) => \`<article class="comparison-card"><div class="section-head tight"><div><p class="eyebrow">\${escapeHtml(group.department)}</p><h3>\${escapeHtml(group.label)}</h3></div><small>\${group.items.length} marka</small></div><p class="compare-meta">\${escapeHtml(group.mainCategory)} · \${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>\${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">\${group.items.map((item, index) => \`<div class="compare-row \${index === 0 ? 'winner' : ''}"><strong>\${escapeHtml(item.brand.name)}</strong><span>\${formatPrice(item.price)}</span><small>\${escapeHtml(item.materialSummary)}</small></div>\`).join('')}</div></article>\`;
 
+  const renderProductCardEditorial = (item) => \`<article class="product-card" data-search="\${escapeHtml(item.searchText)}" data-brand="\${escapeHtml(item.brandSlug)}" data-department="\${escapeHtml(slugify(item.department))}" data-main-category="\${escapeHtml(slugify(item.mainCategory))}" data-sub-category="\${escapeHtml(slugify(item.subCategory))}"><div class="product-media"><img src="\${escapeHtml(item.image)}" alt="\${escapeHtml(item.title)}"><div class="product-overlay"><span class="overlay-brand" style="background:\${escapeHtml(item.brand.color)}">\${escapeHtml(item.brand.name)}</span>\${item.discountRate > 0 ? \`<span class="overlay-sale">%\${item.discountRate}</span>\` : ''}</div></div><div class="product-body"><div class="badge-row"><span class="badge">\${escapeHtml(item.department)}</span><span class="badge">\${escapeHtml(item.mainCategory)}</span><span class="badge">\${escapeHtml(item.subCategory)}</span></div><h3>\${escapeHtml(item.title)}</h3><p>\${escapeHtml(item.productType || item.fit || item.subCategory)} · \${escapeHtml(item.gender || 'Genel koleksiyon')}</p><div class="price-row"><strong>\${formatPrice(item.price)}</strong>\${item.previousPrice > item.price ? \`<s>\${formatPrice(item.previousPrice)}</s>\` : ''}</div><div class="material-panel"><span>Materyal</span><strong>\${escapeHtml(item.materialSummary)}</strong></div><div class="meta-stack"><small><strong>Taksonomi:</strong> \${escapeHtml(item.category)}</small><small><strong>Urun kodu:</strong> \${escapeHtml(item.productCode || '-')}</small></div><div class="card-footer"><span class="product-signature">\${escapeHtml(item.brand.name)} secimi</span>\${item.sourceUrl ? \`<a class="source-link" href="\${escapeHtml(item.sourceUrl)}">Urunu ac</a>\` : ''}</div></div></article>\`;
+  const renderComparisonCardEditorial = (group) => \`<article class="comparison-card"><div class="compare-card-top"><div><p class="eyebrow">\${escapeHtml(group.department)}</p><h3>\${escapeHtml(group.label)}</h3></div><span class="compare-chip">\${group.items.length} marka</span></div><p class="compare-meta">\${escapeHtml(group.mainCategory)} · \${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>\${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">\${group.items.map((item, index) => \`<div class="compare-row \${index === 0 ? 'winner' : ''}"><div class="compare-row-main"><span class="compare-rank">\${index + 1}</span><div><strong>\${escapeHtml(item.brand.name)}</strong><small>\${escapeHtml(item.materialSummary)}</small></div></div><div class="compare-row-side"><span>\${formatPrice(item.price)}</span><small>\${escapeHtml(item.productType || item.fit || item.subCategory)}</small></div></div>\`).join('')}</div></article>\`;
+
   const buildCategoryOverview = (items) => {
     const departments = new Map();
     for (const item of items) {
@@ -449,11 +460,11 @@ function buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, br
     const ribbon = document.getElementById('category-ribbon');
     if (ribbon) ribbon.innerHTML = subCategories.map((value) => \`<span class="category-pill">\${escapeHtml(value)}</span>\`).join('');
     const comparisonGrid = document.getElementById('comparison-grid');
-    if (comparisonGrid) comparisonGrid.innerHTML = data.comparisonGroups.map(renderComparisonCard).join('');
+    if (comparisonGrid) comparisonGrid.innerHTML = data.comparisonGroups.map(renderComparisonCardEditorial).join('');
     const featuredGrid = document.getElementById('featured-grid');
-    if (featuredGrid) featuredGrid.innerHTML = featured.map(renderProductCard).join('');
+    if (featuredGrid) featuredGrid.innerHTML = featured.map(renderProductCardEditorial).join('');
     const productGrid = document.getElementById('product-grid');
-    if (productGrid) productGrid.innerHTML = data.products.map(renderProductCard).join('');
+    if (productGrid) productGrid.innerHTML = data.products.map(renderProductCardEditorial).join('');
     const brandGrid = document.getElementById('brand-grid');
     if (brandGrid) brandGrid.innerHTML = data.brands.map(renderBrandCard).join('');
     fillSelect(document.getElementById('department-filter'), departments, 'Tum departmanlar');
@@ -493,7 +504,7 @@ function buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, br
     if (count) count.textContent = String(brandProducts.length);
     if (departments) departments.textContent = uniqueOptions(brandProducts.map((item) => item.department)).join(', ') || '-';
     if (mainCategories) mainCategories.textContent = uniqueOptions(brandProducts.map((item) => item.mainCategory)).join(', ') || '-';
-    if (grid) grid.innerHTML = brandProducts.map(renderProductCard).join('') || '<div class="empty">Bu marka icin henuz urun yok.</div>';
+    if (grid) grid.innerHTML = brandProducts.map(renderProductCardEditorial).join('') || '<div class="empty">Bu marka icin henuz urun yok.</div>';
   }
 
   async function init() {
@@ -727,8 +738,45 @@ h3 { font-size: 34px; line-height: 0.96; }
 .tight { align-items: start; margin-bottom: 14px; }
 .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .comparison-card { padding: 22px; }
+.compare-card-top {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(32, 24, 21, 0.06);
+  font-size: 12px;
+  font-weight: 600;
+}
 .compare-meta { margin: 0 0 14px; line-height: 1.6; }
-.compare-row { display: grid; gap: 4px; padding: 14px 0 0; }
+.compare-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0 0;
+}
+.compare-row-main, .compare-row-side { display: flex; gap: 12px; }
+.compare-row-main { align-items: start; }
+.compare-row-main div, .compare-row-side { display: grid; gap: 4px; }
+.compare-row-side { justify-items: end; text-align: right; }
+.compare-rank {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(32, 24, 21, 0.08);
+  font-weight: 700;
+  flex: 0 0 auto;
+}
 .compare-row.winner { color: var(--forest); }
 .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .product-grid-featured { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -739,7 +787,27 @@ h3 { font-size: 34px; line-height: 0.96; }
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 .product-card:hover, .brand-card:hover, .comparison-card:hover { transform: translateY(-4px); box-shadow: 0 24px 48px rgba(57, 33, 17, 0.14); }
+.product-media { position: relative; }
 .product-card img { height: 260px; }
+.product-overlay {
+  position: absolute;
+  inset: 14px 14px auto 14px;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.overlay-brand, .overlay-sale {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.16);
+}
+.overlay-sale { background: rgba(32, 24, 21, 0.82); }
 .product-body { padding: 20px; }
 .badge-row { gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .badge { padding: 8px 12px; background: rgba(32, 24, 21, 0.06); }
@@ -747,7 +815,30 @@ h3 { font-size: 34px; line-height: 0.96; }
 .product-body h3 { font-size: 32px; margin-bottom: 8px; }
 .price-row { gap: 12px; align-items: baseline; margin-top: 16px; }
 .price-row strong { font-family: "Cormorant Garamond", serif; font-size: 42px; line-height: 1; }
+.material-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(143, 91, 52, 0.12), rgba(255,255,255,0.7));
+}
+.material-panel span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
+.material-panel strong { font-size: 15px; line-height: 1.6; }
 .meta-stack { padding-top: 14px; border-top: 1px solid var(--line); }
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.product-signature {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
 .source-link { display: inline-flex; margin-top: 16px; color: var(--forest); font-weight: 700; }
 .brand-card {
   display: grid;
