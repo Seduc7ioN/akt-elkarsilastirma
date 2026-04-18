@@ -1,0 +1,27 @@
+{
+  "site": {
+    "url": "https://xn--aktelkarsilastirma-o6b.com",
+    "title": "Aktüel Karşılaştırma",
+    "tagline": "Marketlerin haftalık aktüel ürünleri tek ekranda",
+    "description": "BİM, A101, ŞOK, Migros, Hakmar ve daha fazlasının haftalık aktüel ürün ve kampanyalarını karşılaştır."
+  },
+  "marketOrder": ["bim", "a101", "sok", "migros", "hakmar", "file", "bizimtoptan"],
+  "marketLabels": {
+    "bim": "BİM",
+    "a101": "A101",
+    "sok": "ŞOK",
+    "migros": "Migros",
+    "hakmar": "Hakmar",
+    "file": "File",
+    "bizimtoptan": "Bizim Toptan"
+  },
+  "marketColors": {
+    "bim": "#E3000F",
+    "a101": "#003399",
+    "sok": "#F4A300",
+    "migros": "#F57C00",
+    "hakmar": "#008751",
+    "file": "#7B1FA2",
+    "bizimtoptan": "#1565C0"
+  }
+}

@@ -1,84 +1,49 @@
-# Giyim Karsilastirma
+# Aktüel Karşılaştırma
 
-Bu proje, Turkiye'de faaliyet gosteren giyim markalarinin benzer urunlerini tek ekranda karsilastirmak icin hazirlanan statik site + veri hattidir. Hedef; fiyat, indirim, kampanya, urun icerigi ve kumas dagilimini tek yerde gostermek, sonra bu veriyi Supabase uzerinden canli hale getirmektir.
+Natro'da yayımlanan [aktüelkarşılaştırma.com](https://xn--aktelkarsilastirma-o6b.com/) için statik site üretici. BİM, A101, ŞOK, Migros, Hakmar ve diğer marketlerin haftalık aktüel ürünlerini Supabase'ten okuyup statik HTML üretir ve FTP ile Natro'ya yükler.
 
-## Bu ilk surumde neler var
+## Mimari
 
-- DeFacto, LC Waikiki, Koton, Mavi ve Colin's icin marka iskeleti
-- Giyim urunlerine uygun normalize veri modeli
-- `comparisonKey` mantigi ile benzer urunleri ayni grupta toplama
-- Materyal dagilimi (`%100 pamuk`, `%50 pamuk / %50 polyester`) gosterimi
-- Kampanya etiketi, urun kodu, kalip, yaka, kol tipi ve cinsiyet alanlari
-- Statik on yuzde karsilastirma bloklari ve marka detay sayfalari
-- Supabase'e veri basmak icin hazir REST senkron script'i
+```
+Scraper (Natro cPanel, ayrı)  →  Supabase  →  build.mjs  →  dist/  →  FTP (Natro)
+```
+
+- **Scraper bu repoda değil.** Her market için veri Natro cPanel üzerindeki ayrı bir scraper tarafından Supabase'e yazılır.
+- **Bu repo sadece frontend.** Supabase'ten okur, statik HTML üretir, FTP ile deploy eder.
+
+## Supabase şeması (mevcut, değiştirilmez)
+
+- `markets` — id (text PK), name, branch_count, website
+- `weekly_catalogs` — id (uuid), market_id, week_start, week_end, period_text, scraped_at
+- `products` — id (uuid), catalog_id, market_id, name, category, price, old_price, discount_pct, image, url, badge, scraped_at
+- `comments` — id, market_id, username, text, created_at
 
 ## Komutlar
 
 ```bash
-npm run sync
-npm run import
-npm run build
-npm run supabase:sync
-npm run pipeline
+npm run build       # Supabase'ten cek, dist/ uret
+npm run dev         # dist/ klasorunu yerel http://localhost:4173'te yayinla
+npm run deploy:ftp  # dist/ klasorunu FTP ile Natro'ya yukle
+npm run publish     # build + deploy (tek komutta)
 ```
 
-Yerelde onizleme:
+## Kurulum
 
-```bash
-npm run dev
-```
-
-## Veri akisi
-
-1. `data/imports/manual/manual-feed.json` veya ileride otomatik adaptorler ham urunleri uretir.
-2. `npm run import` bu kayitlari ortak formata donusturur ve `data/campaigns.json` icine yazar.
-3. `npm run build` yeni statik siteyi `dist/` altinda uretir.
-4. `npm run supabase:sync` normalize edilen veriyi Supabase tablolarina gonderir.
-
-Tam otomatik zincir:
-
-1. `npm run sync`
-2. `npm run import`
-3. `npm run build`
-4. `npm run supabase:sync`
-
-Kisa yol:
-
-```bash
-npm run pipeline
-```
-
-## Canli otomasyon stratejisi
-
-Bu repo su anda giyim odakli cekirdek sistemi ve veri modelini hazirlar. Marka bazli canli adaptorler, her sitenin urun listeleme ve detay sayfasi yapisina gore tek tek kalibre edilmelidir. Bu nedenle:
-
-- `config/markets.config.json` icinde markalar tanimlidir
-- Ilk asamada hepsi `enabled: false` birakilmistir
-- Gercek adaptor yazildikca `npm run sync` ile otomatik veri cekilebilir
-
-## Supabase notu
-
-`.env` icinde su alanlari doldur:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_PRODUCTS_TABLE`
-- `SUPABASE_BRANDS_TABLE`
-- `SUPABASE_COMPARISON_TABLE`
-
-## Sonraki profesyonel adimlar
-
-1. Her marka icin ayri adaptor yazmak
-2. Urun sayfasindan materyal ve kampanya alanlarini otomatik almak
-3. Benzer urun eslestirmesini kuralla + AI destekli hale getirmek
-4. Supabase tarafinda history tablosu ile fiyat degisimlerini saklamak
-5. Zamanlanmis gorevle periyodik sync + build + deploy kurmak
+1. `.env.example`'ı `.env` olarak kopyala ve doldur:
+   - `SUPABASE_URL`, `SUPABASE_ANON_KEY` — Supabase dashboard'dan
+   - `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`, `FTP_REMOTE_DIR` — Natro cPanel
+   - `SITE_URL` — siteURL (opsiyonel, default: aktüelkarşılaştırma.com)
+2. `npm run build` ile derle, `dist/` klasöründe site oluşur.
+3. `npm run deploy:ftp` ile Natro'ya gönder.
 
 ## Otomasyon
 
-GitHub Actions tabanli otomasyon iskeleti hazirlandi:
+`.github/workflows/catalog-pipeline.yml` her 3 saatte bir build alıp FTP ile deploy eder. GitHub Secrets olarak aynı env değerlerini eklemen gerekiyor.
 
-- workflow dosyasi: [.github/workflows/catalog-pipeline.yml](C:\Users\eseru\OneDrive\Belgeler\New%20project\.github\workflows\catalog-pipeline.yml:1)
-- mimari dokumani: [docs/AUTOMATION_ARCHITECTURE.md](C:\Users\eseru\OneDrive\Belgeler\New%20project\docs\AUTOMATION_ARCHITECTURE.md:1)
+## Üretilen sayfalar
 
-Bu workflow su an manuel tetikleme icin hazir. Saatlik veya gunluk scheduler bir sonraki adimda aktif edilebilir.
+- `/` — anasayfa (market grid, bu haftanın katalogları, en yüksek indirimler, son ürünler)
+- `/urunler/` — tüm ürün arama + market/kategori filtresi
+- `/market/<id>/` — marketin son kataloğu + ürünleri
+- `/market/<id>/<catalog_id>/` — belirli haftalık katalog ve ürünleri
+- `/sitemap.xml`, `/robots.txt`

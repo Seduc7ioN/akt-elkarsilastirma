@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.akakce.com)",
+      "WebFetch(domain:www.haftalikaktuel.com)",
+      "Bash(node --check scripts/build.mjs)",
+      "Bash(node --check scripts/lib/supabase.mjs)",
+      "Bash(node --check scripts/lib/env.mjs)",
+      "Bash(curl -s -o /dev/null -w \"env URL \\(%{http_code}\\)\\\\n\" \"https://kbxpilljewvgjdzdnlgv.supabase.co/rest/v1/weekly_catalogs?select=id&limit=1\" -H \"apikey: sb_publishable_xLOTpzn5oaAMofCtSDkZDg_OIAKJKbh\")",
+      "Bash(curl -s \"https://kbxpilljewvgjdzdnlgv.supabase.co/rest/v1/weekly_catalogs?select=id,market_id&limit=3\" -H \"apikey: sb_publishable_xLOTpzn5oaAMofCtSDkZDg_OIAKJKbh\")",
+      "Bash(npm run *)"
+    ]
+  }
+}

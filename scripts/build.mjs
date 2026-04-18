@@ -1,1004 +1,481 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
+import { supabaseClient } from "./lib/supabase.mjs";
 
 const root = process.cwd();
 loadEnv(root);
-const distDir = path.join(root, "dist");
-const siteUrl = (process.env.SITE_URL || "https://giyimkarsilastirma.com").replace(/\/$/, "");
-const assetVersion = Date.now().toString();
-const supabaseUrl = String(process.env.SUPABASE_URL || "").replace(/\/$/, "");
-const supabaseAnonKey = String(process.env.SUPABASE_ANON_KEY || "");
-const productsTable = process.env.SUPABASE_PRODUCTS_TABLE || "products";
-const brandsTable = process.env.SUPABASE_BRANDS_TABLE || "brands";
-const comparisonTable = process.env.SUPABASE_COMPARISON_TABLE || "comparison_groups";
 
-const [brands, products] = await Promise.all([
-  readJson("data/markets.json"),
-  readJson("data/campaigns.json"),
+const siteConfig = JSON.parse(await readFile(path.join(root, "config/site.config.json"), "utf8"));
+const siteUrl = (process.env.SITE_URL || siteConfig.site.url).replace(/\/$/, "");
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
+const distDir = path.join(root, "dist");
+const assetVersion = Date.now().toString();
+
+const db = supabaseClient({ url: supabaseUrl, key: supabaseAnonKey });
+
+console.log("Supabase'ten veri cekiliyor...");
+const [markets, catalogs, products] = await Promise.all([
+  db.query("markets", "select=*"),
+  db.query("weekly_catalogs", "select=*&order=week_start.desc"),
+  db.query("products", "select=*&order=scraped_at.desc&limit=5000"),
 ]);
 
-const brandMap = new Map(brands.map((brand) => [brand.slug, brand]));
-const validProducts = products
-  .filter((item) => brandMap.has(item.brandSlug))
-  .map((item) => ({ ...item, brand: brandMap.get(item.brandSlug) }))
-  .sort((a, b) => a.price - b.price);
+console.log(`${markets.length} market, ${catalogs.length} katalog, ${products.length} urun.`);
 
-const comparisonGroups = buildComparisonGroups(validProducts);
-const featured = validProducts
-  .slice()
-  .sort((a, b) => {
-    if (b.discountRate !== a.discountRate) return b.discountRate - a.discountRate;
-    return a.price - b.price;
-  })
-  .slice(0, 8);
+const marketById = new Map(markets.map((m) => [m.id, m]));
+const catalogById = new Map(catalogs.map((c) => [c.id, c]));
+const catalogsByMarket = groupBy(catalogs, "market_id");
+const productsByCatalog = groupBy(products, "catalog_id");
+const productsByMarket = groupBy(products, "market_id");
 
-const departmentOptions = uniqueOptions(validProducts.map((item) => item.department));
-const mainCategoryOptions = uniqueOptions(validProducts.map((item) => item.mainCategory));
-const subCategoryOptions = uniqueOptions(validProducts.map((item) => item.subCategory));
+const latestCatalogByMarket = new Map();
+for (const [mid, list] of catalogsByMarket) latestCatalogByMarket.set(mid, list[0]);
+
+const orderedMarkets = orderMarkets(markets, siteConfig.marketOrder);
 
 await rm(distDir, { recursive: true, force: true });
-await mkdir(path.join(distDir, "brand"), { recursive: true });
-await mkdir(path.join(distDir, "assets"), { recursive: true });
+await mkdir(path.join(distDir, "market"), { recursive: true });
+await mkdir(path.join(distDir, "urunler"), { recursive: true });
 
 await Promise.all([
   writeFile(path.join(distDir, "styles.css"), buildStyles(), "utf8"),
-  writeFile(path.join(distDir, "app.js"), buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }), "utf8"),
-  writeFile(path.join(distDir, "index.html"), renderHome({ brands, validProducts, comparisonGroups, featured, departmentOptions, mainCategoryOptions, subCategoryOptions }), "utf8"),
-  writeFile(path.join(distDir, "admin.html"), renderAdmin({ brands, validProducts, comparisonGroups }), "utf8"),
-  writeFile(path.join(distDir, "featured.json"), JSON.stringify(featured, null, 2), "utf8"),
-  writeFile(path.join(distDir, "robots.txt"), buildRobots(), "utf8"),
-  writeFile(path.join(distDir, "sitemap.xml"), buildSitemap(brands), "utf8"),
+  writeFile(path.join(distDir, "app.js"), buildClientJs(), "utf8"),
+  writeFile(path.join(distDir, "index.html"), renderHome(), "utf8"),
+  writeFile(path.join(distDir, "urunler/index.html"), renderAllProducts(), "utf8"),
+  writeFile(path.join(distDir, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`, "utf8"),
+  writeFile(path.join(distDir, "sitemap.xml"), buildSitemap(), "utf8"),
 ]);
 
-for (const brand of brands) {
-  const items = validProducts.filter((item) => item.brandSlug === brand.slug);
-  const brandDir = path.join(distDir, "brand", brand.slug);
-  await mkdir(brandDir, { recursive: true });
-  await writeFile(path.join(brandDir, "index.html"), renderBrandPage({ brand, items }), "utf8");
+for (const market of orderedMarkets) {
+  const dir = path.join(distDir, "market", market.id);
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, "index.html"), renderMarket(market), "utf8");
+
+  const cats = catalogsByMarket.get(market.id) || [];
+  for (const catalog of cats) {
+    const catDir = path.join(dir, catalog.id);
+    await mkdir(catDir, { recursive: true });
+    await writeFile(path.join(catDir, "index.html"), renderCatalog(market, catalog), "utf8");
+  }
 }
 
-console.log(`Build tamamlandi. ${validProducts.length} giyim urunu ve ${comparisonGroups.length} karsilastirma grubu uretildi.`);
+console.log(`Build tamamlandi -> ${distDir}`);
 
-async function readJson(filePath) {
-  return JSON.parse(await readFile(path.join(root, filePath), "utf8"));
-}
+function renderHome() {
+  const latestCatalogs = orderedMarkets
+    .map((m) => ({ market: m, catalog: latestCatalogByMarket.get(m.id) }))
+    .filter((x) => x.catalog);
+  const topDiscounts = products
+    .filter((p) => p.discount_pct && p.discount_pct > 0)
+    .sort((a, b) => (b.discount_pct || 0) - (a.discount_pct || 0))
+    .slice(0, 12);
+  const recentProducts = products.slice(0, 24);
 
-function renderHome({ brands, validProducts, comparisonGroups, featured, departmentOptions, mainCategoryOptions, subCategoryOptions }) {
   return layout(
-    "Giyim Karsilastirma",
-    "Erkek, kadin ve cocuk kategorilerinde ust giyim, alt giyim ve dis giyim urunlerini karsilastirin.",
+    siteConfig.site.title,
+    siteConfig.site.description,
     `<main class="page">
-      <header class="topbar">
-        <a class="logo" href="/">
-          <span class="logo-mark">FF</span>
-          <span><strong>FinderFit</strong><small>Canli katalog ve fiyat izi</small></span>
-        </a>
-        <nav class="nav">
-          <a href="#karsilastirmalar">Karsilastirmalar</a>
-          <a href="#urunler">Katalog</a>
-          <a href="#markalar">Markalar</a>
-          <a href="/admin.html">Veri merkezi</a>
-        </nav>
-      </header>
+      ${renderHeader("home")}
 
       <section class="hero">
-        <div class="hero-copy-block">
-          <p class="eyebrow">Canli katalog akisi</p>
-          <h1>Tum markalar, tek akista.</h1>
-          <p class="hero-copy">Urunleri tek tek aramak yerine fiyat, kategori, materyal ve kampanyayi ayni akista gor. FinderFit, giyim karsilastirmayi daha dogal ve hizli bir alisveris deneyimine cevirir.</p>
-          <div class="hero-marquee">
-            <span>Fiyat farki</span>
-            <span>Materyal analizi</span>
-            <span>Kampanya izi</span>
-            <span>Turkiye giyim radari</span>
-          </div>
-          <div class="search-shell">
-            <div>
-              <span class="search-label">Hizli arama</span>
-              <strong>Tisort, gomlek, sweat, pantolon, hirka, kase kaban</strong>
-            </div>
-            <a class="button primary" href="#urunler">Katalogu kesfet</a>
-          </div>
-          <div class="hero-tags">
-            ${departmentOptions.map((value) => `<span class="hero-tag">${escapeHtml(value)}</span>`).join("")}
-            ${mainCategoryOptions.slice(0, 3).map((value) => `<span class="hero-tag muted">${escapeHtml(value)}</span>`).join("")}
+        <div>
+          <p class="eyebrow">Canli akis</p>
+          <h1>${escapeHtml(siteConfig.site.tagline)}</h1>
+          <p class="hero-sub">BİM, A101, ŞOK, Migros, Hakmar ve daha fazla market. Haftalık katalog ve aktüel ürünler tek akışta.</p>
+          <div class="hero-stats">
+            <div><strong>${markets.length}</strong><span>market</span></div>
+            <div><strong>${catalogs.length}</strong><span>katalog</span></div>
+            <div><strong>${products.length}</strong><span>ürün</span></div>
           </div>
           <div class="hero-actions">
-            <a class="button primary" href="#urunler">Canli katalog</a>
-            <a class="button" href="#karsilastirmalar">En iyi fiyatlari incele</a>
+            <a class="btn primary" href="/urunler/">Tüm ürünleri ara</a>
+            <a class="btn" href="#marketler">Marketler</a>
           </div>
         </div>
-        <div class="hero-panel">
-          <article class="hero-look">
-            <img src="${escapeHtml((featured[0] || validProducts[0])?.image || "")}" alt="${escapeHtml((featured[0] || validProducts[0])?.title || "One cikan urun")}">
-            <div class="hero-look-overlay">
-              <p class="eyebrow inverse">Haftanin secimi</p>
-              <strong>${escapeHtml((featured[0] || validProducts[0])?.brand?.name || "FinderFit")}</strong>
-              <p>${escapeHtml((featured[0] || validProducts[0])?.subCategory || "")} · ${escapeHtml((featured[0] || validProducts[0])?.materialSummary || "")}</p>
-            </div>
-          </article>
-          <div class="metric-grid editorial-metrics">
-            <article class="metric"><span>Marka havuzu</span><strong id="metric-brand-count">${brands.length}</strong><small>Turkiye odakli zincirler</small></article>
-            <article class="metric"><span>Canli urun</span><strong id="metric-product-count">${validProducts.length}</strong><small>Supabase ile guncel</small></article>
-            <article class="metric"><span>Eslesme grubu</span><strong id="metric-group-count">${comparisonGroups.length}</strong><small>Benzer urun kiyasi</small></article>
-          </div>
-          <div class="hero-note"><strong>Kapsam</strong><p>${departmentOptions.join(", ")} · ${mainCategoryOptions.join(", ")}</p></div>
-          <div class="hero-note soft"><strong>Su an odakta</strong><p>${subCategoryOptions.slice(0, 6).join(" · ")}</p></div>
+      </section>
+
+      <section class="section" id="marketler">
+        <div class="section-head"><h2>Marketler</h2><small>${orderedMarkets.length} market</small></div>
+        <div class="market-grid">
+          ${orderedMarkets.map(renderMarketCard).join("")}
         </div>
-      </section>
-
-      <section class="brand-strip">
-        ${brands.map((brand) => `<span class="brand-strip-item"><span class="brand-strip-dot" style="background:${escapeHtml(brand.color)}"></span>${escapeHtml(brand.name)}</span>`).join("")}
-      </section>
-
-      <section class="category-ribbon" id="category-ribbon">
-        ${subCategoryOptions.map((value) => `<span class="category-pill">${escapeHtml(value)}</span>`).join("")}
-      </section>
-
-      <section class="overview-grid" id="overview-grid">
-        ${buildCategoryOverview(validProducts)}
-      </section>
-
-      <section class="filters">
-        <label><span>Urun ara</span><input id="search" type="search" placeholder="gomlek, tisort, pantolon, hirka"></label>
-        <label><span>Departman</span><select id="department-filter"><option value="">Tum departmanlar</option>${departmentOptions.map((value) => `<option value="${escapeHtml(slugify(value))}">${escapeHtml(value)}</option>`).join("")}</select></label>
-        <label><span>Ana kategori</span><select id="main-category-filter"><option value="">Tum ana kategoriler</option>${mainCategoryOptions.map((value) => `<option value="${escapeHtml(slugify(value))}">${escapeHtml(value)}</option>`).join("")}</select></label>
-        <label><span>Alt kategori</span><select id="sub-category-filter"><option value="">Tum alt kategoriler</option>${subCategoryOptions.map((value) => `<option value="${escapeHtml(slugify(value))}">${escapeHtml(value)}</option>`).join("")}</select></label>
-        <label><span>Marka</span><select id="brand-filter"><option value="">Tum markalar</option>${brands.map((brand) => `<option value="${escapeHtml(brand.slug)}">${escapeHtml(brand.name)}</option>`).join("")}</select></label>
-      </section>
-
-      <section class="section" id="karsilastirmalar">
-        <div class="section-head"><div><p class="eyebrow">Karsilastirma gruplari</p><h2>Kategoriye gore benzer urunler</h2></div><small><span id="comparison-group-count">${comparisonGroups.length}</span> grup</small></div>
-        <div class="comparison-grid" id="comparison-grid">${comparisonGroups.map(renderComparisonCardPremium).join("")}</div>
       </section>
 
       <section class="section">
-        <div class="section-head"><div><p class="eyebrow">One cikanlar</p><h2>Fiyat veya indirim dikkat ceken urunler</h2></div></div>
-        <div class="product-grid product-grid-featured" id="featured-grid">${featured.map(renderProductCardPremium).join("")}</div>
+        <div class="section-head"><h2>Bu haftanın katalogları</h2><small>${latestCatalogs.length} aktif</small></div>
+        <div class="catalog-grid">
+          ${latestCatalogs.map(({ market, catalog }) => renderCatalogCard(market, catalog)).join("")}
+        </div>
       </section>
 
-      <section class="section" id="urunler">
-        <div class="section-head"><div><p class="eyebrow">Tum urunler</p><h2>Kategori bazli katalog akisi</h2></div><small><strong id="result-count">${validProducts.length}</strong> kayit</small></div>
-        <div class="product-grid" id="product-grid">${validProducts.map(renderProductCardPremium).join("")}</div>
-        <div class="empty hidden" id="empty-state">Filtrelere uygun urun bulunamadi.</div>
+      ${topDiscounts.length ? `
+      <section class="section">
+        <div class="section-head"><h2>En yüksek indirimler</h2><small>% indirim sıralı</small></div>
+        <div class="product-grid">
+          ${topDiscounts.map(renderProductCard).join("")}
+        </div>
+      </section>` : ""}
+
+      <section class="section">
+        <div class="section-head"><h2>Son eklenen ürünler</h2><small>${recentProducts.length} ürün</small></div>
+        <div class="product-grid">
+          ${recentProducts.map(renderProductCard).join("")}
+        </div>
       </section>
 
-      <section class="section" id="markalar">
-        <div class="section-head"><div><p class="eyebrow">Takip edilen markalar</p><h2>Kaynak havuzu</h2></div></div>
-        <div class="brand-grid" id="brand-grid">${brands.map(renderBrandCard).join("")}</div>
-      </section>
-    </main>`,
-    { page: "home" }
+      ${renderFooter()}
+    </main>`
   );
 }
 
-function renderAdmin({ brands, validProducts, comparisonGroups }) {
-  const brandRows = brands.map((brand) => {
-    const items = validProducts.filter((item) => item.brandSlug === brand.slug);
-    return `<tr><td>${escapeHtml(brand.name)}</td><td>${items.length}</td><td>${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(", ") || "-")}</td><td>${comparisonGroups.filter((group) => group.bestPrice?.brandSlug === brand.slug).length}</td></tr>`;
-  }).join("");
+function renderMarket(market) {
+  const cats = catalogsByMarket.get(market.id) || [];
+  const marketProducts = (productsByMarket.get(market.id) || []).slice(0, 200);
+  const color = marketColor(market.id);
 
   return layout(
-    "Yonetim",
-    "Giyim veri hatti ve kategori yapisi.",
+    `${marketLabel(market)} aktüel ürünleri`,
+    `${marketLabel(market)} haftalık aktüel katalog ve ürünleri.`,
     `<main class="page">
-      <section class="hero admin-hero">
-        <div><p class="eyebrow">Yonetim paneli</p><h1>Katalog artik departman ve kategori bazli calisiyor.</h1><p class="hero-copy">Veri modeli artik Erkek, Kadin, Cocuk ile ust giyim, alt giyim ve dis giyim ayrimini destekliyor.</p></div>
-        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Marka</span><strong id="metric-brand-count">${brands.length}</strong></article><article class="metric"><span>Urun</span><strong id="metric-product-count">${validProducts.length}</strong></article><article class="metric"><span>Grup</span><strong id="metric-group-count">${comparisonGroups.length}</strong></article></div></div>
+      ${renderHeader("market")}
+
+      <section class="hero market-hero" style="--accent:${color}">
+        <div>
+          <p class="eyebrow">${escapeHtml(marketLabel(market))}</p>
+          <h1>${escapeHtml(marketLabel(market))} aktüel ürünleri</h1>
+          <p class="hero-sub">${cats.length} haftalık katalog · ${marketProducts.length} ürün listeleniyor.</p>
+          ${market.website ? `<a class="btn" href="${escapeHtml(market.website)}" target="_blank" rel="noopener">Resmi site</a>` : ""}
+        </div>
       </section>
-      <section class="section"><div class="table-wrap"><table><thead><tr><th>Marka</th><th>Urun</th><th>Departman</th><th>En iyi fiyat grubu</th></tr></thead><tbody id="admin-brand-rows">${brandRows}</tbody></table></div></section>
-    </main>`,
-    { page: "admin" }
+
+      ${cats.length ? `
+      <section class="section">
+        <div class="section-head"><h2>Haftalık kataloglar</h2><small>${cats.length} katalog</small></div>
+        <div class="catalog-grid">
+          ${cats.map((c) => renderCatalogCard(market, c)).join("")}
+        </div>
+      </section>` : ""}
+
+      <section class="section">
+        <div class="section-head"><h2>Ürünler</h2><small>${marketProducts.length} kayıt</small></div>
+        <div class="product-grid">
+          ${marketProducts.map(renderProductCard).join("") || `<p class="empty">Bu market için henüz ürün yok.</p>`}
+        </div>
+      </section>
+
+      ${renderFooter()}
+    </main>`
   );
 }
 
-function renderBrandPage({ brand, items }) {
+function renderCatalog(market, catalog) {
+  const catProducts = productsByCatalog.get(catalog.id) || [];
+  const color = marketColor(market.id);
+
   return layout(
-    `${brand.name} urunleri`,
-    `${brand.name} icin departman ve kategori bazli urun listesi.`,
+    `${marketLabel(market)} ${catalog.period_text || dateRange(catalog)} kataloğu`,
+    `${marketLabel(market)} ${catalog.period_text || dateRange(catalog)} haftalık aktüel ürünleri.`,
     `<main class="page">
-      <section class="hero brand-hero">
-        <div><p class="eyebrow">${escapeHtml(brand.segment || "Marka")}</p><h1>${escapeHtml(brand.name)} urun akisiniz</h1><p class="hero-copy">Bu marka icin kategori bazli urun ve fiyat akisi burada listeleniyor.</p><div class="hero-actions"><a class="button primary" href="/">Ana sayfaya don</a><a class="button" href="${escapeHtml(brand.website)}">Resmi site</a></div></div>
-        <div class="hero-panel"><div class="metric-grid"><article class="metric"><span>Urun</span><strong id="brand-product-count">${items.length}</strong></article><article class="metric"><span>Departman</span><strong class="metric-small" id="brand-departments">${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(", ") || "-")}</strong></article><article class="metric"><span>Ana kategori</span><strong class="metric-small" id="brand-main-categories">${escapeHtml(uniqueOptions(items.map((item) => item.mainCategory)).join(", ") || "-")}</strong></article></div></div>
+      ${renderHeader("market")}
+
+      <section class="hero market-hero" style="--accent:${color}">
+        <div>
+          <p class="eyebrow"><a href="/market/${market.id}/">${escapeHtml(marketLabel(market))}</a> · haftalık katalog</p>
+          <h1>${escapeHtml(catalog.period_text || dateRange(catalog))}</h1>
+          <p class="hero-sub">${catProducts.length} ürün · ${dateRange(catalog)}</p>
+        </div>
       </section>
-      <section class="section"><div class="product-grid" id="brand-product-grid">${items.map(renderProductCardPremium).join("") || `<div class="empty">Bu marka icin henuz urun yok.</div>`}</div></section>
-    </main>`,
-    { page: "brand", brandSlug: brand.slug }
+
+      <section class="section">
+        <div class="section-head"><h2>Katalog ürünleri</h2><small>${catProducts.length} ürün</small></div>
+        <div class="product-grid">
+          ${catProducts.map(renderProductCard).join("") || `<p class="empty">Bu katalogda henüz ürün yok.</p>`}
+        </div>
+      </section>
+
+      ${renderFooter()}
+    </main>`
   );
 }
 
-function renderBrandCard(brand) {
-  return `<a class="brand-card" href="/brand/${brand.slug}/" style="--brand:${escapeHtml(brand.color)}"><span class="brand-dot"></span><strong>${escapeHtml(brand.name)}</strong><small>${escapeHtml(brand.segment || "")}</small></a>`;
+function renderAllProducts() {
+  const all = products.slice(0, 1000);
+  const categories = [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
+
+  return layout(
+    "Tüm ürünler - Aktüel Karşılaştırma",
+    "BİM, A101, ŞOK, Migros, Hakmar ve diğer marketlerin aktüel ürünlerini ara ve karşılaştır.",
+    `<main class="page">
+      ${renderHeader("urunler")}
+
+      <section class="hero compact">
+        <div>
+          <p class="eyebrow">Arama</p>
+          <h1>Tüm aktüel ürünler</h1>
+          <p class="hero-sub">${all.length} ürün listeleniyor. Ara, market veya kategoriye göre filtrele.</p>
+        </div>
+      </section>
+
+      <section class="filters">
+        <label><span>Ürün ara</span><input id="search" type="search" placeholder="süt, deterjan, şampuan..."></label>
+        <label><span>Market</span><select id="market-filter"><option value="">Tüm marketler</option>${orderedMarkets.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(marketLabel(m))}</option>`).join("")}</select></label>
+        <label><span>Kategori</span><select id="category-filter"><option value="">Tüm kategoriler</option>${categories.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select></label>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Sonuçlar</h2><small><span id="count">${all.length}</span> ürün</small></div>
+        <div class="product-grid" id="product-grid">
+          ${all.map(renderProductCard).join("")}
+        </div>
+        <p class="empty hidden" id="empty">Filtrelere uygun ürün bulunamadı.</p>
+      </section>
+
+      ${renderFooter()}
+    </main>`
+  );
 }
 
-function renderComparisonCardPremium(group) {
-  return `<article class="comparison-card"><div class="section-head tight"><div><p class="eyebrow">${escapeHtml(group.department)}</p><h3>${escapeHtml(group.label)}</h3></div><small>${group.items.length} marka</small></div><p class="compare-meta">${escapeHtml(group.mainCategory)} · ${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">${group.items.map((item, index) => `<div class="compare-row ${index === 0 ? "winner" : ""}"><strong>${escapeHtml(item.brand.name)}</strong><span>${formatPrice(item.price)}</span><small>${escapeHtml(item.materialSummary)}</small></div>`).join("")}</div></article>`;
+function renderHeader(active) {
+  return `<header class="topbar">
+    <a class="logo" href="/">
+      <span class="logo-mark">AK</span>
+      <span><strong>Aktüel Karşılaştırma</strong><small>Haftalık market kampanyaları</small></span>
+    </a>
+    <nav class="nav">
+      <a href="/" class="${active === "home" ? "active" : ""}">Anasayfa</a>
+      <a href="/urunler/" class="${active === "urunler" ? "active" : ""}">Ürünler</a>
+      <a href="/#marketler" class="${active === "market" ? "active" : ""}">Marketler</a>
+    </nav>
+  </header>`;
 }
 
-function renderProductCardPremium(item) {
-  return `<article class="product-card" data-search="${escapeHtml(item.searchText)}" data-brand="${escapeHtml(item.brandSlug)}" data-department="${escapeHtml(slugify(item.department))}" data-main-category="${escapeHtml(slugify(item.mainCategory))}" data-sub-category="${escapeHtml(slugify(item.subCategory))}"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}"><div class="product-body"><div class="badge-row"><span class="badge" style="background:${escapeHtml(item.brand.color)}14;color:${escapeHtml(item.brand.color)}">${escapeHtml(item.brand.name)}</span><span class="badge">${escapeHtml(item.department)}</span><span class="badge">${escapeHtml(item.mainCategory)}</span>${item.discountRate > 0 ? `<span class="badge accent">%${item.discountRate} indirim</span>` : ""}</div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.subCategory)} · ${escapeHtml(item.productType || item.fit)} · ${escapeHtml(item.gender)}</p><div class="price-row"><strong>${formatPrice(item.price)}</strong>${item.previousPrice > item.price ? `<s>${formatPrice(item.previousPrice)}</s>` : ""}</div><div class="meta-stack"><small><strong>Taksonomi:</strong> ${escapeHtml(item.category)}</small><small><strong>Materyal:</strong> ${escapeHtml(item.materialSummary)}</small><small><strong>Urun kodu:</strong> ${escapeHtml(item.productCode || "-")}</small></div>${item.sourceUrl ? `<a class="source-link" href="${escapeHtml(item.sourceUrl)}">Kaynak urune git</a>` : ""}</div></article>`;
+function renderFooter() {
+  return `<footer class="footer">
+    <p>© ${new Date().getFullYear()} Aktüel Karşılaştırma · Veriler her marketin resmi sitesinden alınmaktadır.</p>
+    <p><small>Son güncelleme: ${new Date().toLocaleString("tr-TR")}</small></p>
+  </footer>`;
 }
 
-function renderComparisonCard(group) {
-  return `<article class="comparison-card"><div class="compare-card-top"><div><p class="eyebrow">${escapeHtml(group.department)}</p><h3>${escapeHtml(group.label)}</h3></div><span class="compare-chip">${group.items.length} marka</span></div><p class="compare-meta">${escapeHtml(group.mainCategory)} · ${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">${group.items.map((item, index) => `<div class="compare-row ${index === 0 ? "winner" : ""}"><div class="compare-row-main"><span class="compare-rank">${index + 1}</span><div><strong>${escapeHtml(item.brand.name)}</strong><small>${escapeHtml(item.materialSummary)}</small></div></div><div class="compare-row-side"><span>${formatPrice(item.price)}</span><small>${escapeHtml(item.productType || item.fit || item.subCategory)}</small></div></div>`).join("")}</div></article>`;
+function renderMarketCard(market) {
+  const color = marketColor(market.id);
+  const count = (productsByMarket.get(market.id) || []).length;
+  return `<a class="market-card" href="/market/${market.id}/" style="--accent:${color}">
+    <span class="market-mark">${escapeHtml(marketLabel(market).slice(0, 2).toUpperCase())}</span>
+    <strong>${escapeHtml(marketLabel(market))}</strong>
+    <small>${count} ürün · ${market.branch_count || "?"} şube</small>
+  </a>`;
 }
 
-function renderProductCard(item) {
-  return `<article class="product-card" data-search="${escapeHtml(item.searchText)}" data-brand="${escapeHtml(item.brandSlug)}" data-department="${escapeHtml(slugify(item.department))}" data-main-category="${escapeHtml(slugify(item.mainCategory))}" data-sub-category="${escapeHtml(slugify(item.subCategory))}"><div class="product-media"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}"><div class="product-overlay"><span class="overlay-brand" style="background:${escapeHtml(item.brand.color)}">${escapeHtml(item.brand.name)}</span>${item.discountRate > 0 ? `<span class="overlay-sale">%${item.discountRate}</span>` : ""}</div></div><div class="product-body"><div class="badge-row"><span class="badge">${escapeHtml(item.department)}</span><span class="badge">${escapeHtml(item.mainCategory)}</span><span class="badge">${escapeHtml(item.subCategory)}</span></div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.productType || item.fit || item.subCategory)} · ${escapeHtml(item.gender || "Genel koleksiyon")}</p><div class="price-row"><strong>${formatPrice(item.price)}</strong>${item.previousPrice > item.price ? `<s>${formatPrice(item.previousPrice)}</s>` : ""}</div><div class="material-panel"><span>Materyal</span><strong>${escapeHtml(item.materialSummary)}</strong></div><div class="meta-stack"><small><strong>Taksonomi:</strong> ${escapeHtml(item.category)}</small><small><strong>Urun kodu:</strong> ${escapeHtml(item.productCode || "-")}</small></div><div class="card-footer"><span class="product-signature">${escapeHtml(item.brand.name)} secimi</span>${item.sourceUrl ? `<a class="source-link" href="${escapeHtml(item.sourceUrl)}">Urunu ac</a>` : ""}</div></div></article>`;
+function renderCatalogCard(market, catalog) {
+  const color = marketColor(market.id);
+  const count = (productsByCatalog.get(catalog.id) || []).length;
+  return `<a class="catalog-card" href="/market/${market.id}/${catalog.id}/" style="--accent:${color}">
+    <div class="catalog-card-head">
+      <span class="market-dot"></span>
+      <strong>${escapeHtml(marketLabel(market))}</strong>
+    </div>
+    <h3>${escapeHtml(catalog.period_text || dateRange(catalog))}</h3>
+    <p>${dateRange(catalog)}</p>
+    <small>${count} ürün</small>
+  </a>`;
 }
 
-function buildComparisonGroups(items) {
-  const groups = new Map();
-  for (const item of items) {
-    if (!groups.has(item.comparisonKey)) groups.set(item.comparisonKey, []);
-    groups.get(item.comparisonKey).push(item);
-  }
-  return [...groups.entries()].map(([comparisonKey, groupItems]) => {
-    const sorted = groupItems.slice().sort((a, b) => a.price - b.price);
-    return {
-      comparisonKey,
-      label: makeReadableLabel(comparisonKey),
-      department: groupItems[0]?.department || "Diger",
-      mainCategory: groupItems[0]?.mainCategory || "Diger",
-      subCategory: groupItems[0]?.subCategory || "Diger",
-      items: sorted,
-      bestPrice: sorted[0] || null,
-    };
-  }).sort((a, b) => (a.bestPrice?.price || 0) - (b.bestPrice?.price || 0));
+function renderProductCard(p) {
+  const market = marketById.get(p.market_id);
+  const color = marketColor(p.market_id);
+  const search = normalize(`${p.name || ""} ${p.category || ""} ${marketLabel(market)}`);
+  return `<article class="product-card" data-search="${escapeHtml(search)}" data-market="${escapeHtml(p.market_id || "")}" data-category="${escapeHtml(p.category || "")}" style="--accent:${color}">
+    ${p.image ? `<div class="product-img"><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name || "")}" loading="lazy"></div>` : `<div class="product-img placeholder"></div>`}
+    <div class="product-body">
+      <div class="product-tags">
+        <span class="tag market-tag">${escapeHtml(marketLabel(market))}</span>
+        ${p.discount_pct ? `<span class="tag discount">%${p.discount_pct} indirim</span>` : ""}
+        ${p.badge ? `<span class="tag">${escapeHtml(p.badge)}</span>` : ""}
+      </div>
+      <h3>${escapeHtml(p.name || "")}</h3>
+      ${p.category ? `<p class="muted">${escapeHtml(p.category)}</p>` : ""}
+      <div class="price-row">
+        <strong>${formatPrice(p.price)}</strong>
+        ${p.old_price && Number(p.old_price) > Number(p.price || 0) ? `<s>${formatPrice(p.old_price)}</s>` : ""}
+      </div>
+      ${p.url ? `<a class="product-link" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">Ürüne git →</a>` : ""}
+    </div>
+  </article>`;
 }
 
-function buildCategoryOverview(items) {
-  const departments = new Map();
-  for (const item of items) {
-    if (!departments.has(item.department)) departments.set(item.department, new Map());
-    const mainMap = departments.get(item.department);
-    if (!mainMap.has(item.mainCategory)) mainMap.set(item.mainCategory, 0);
-    mainMap.set(item.mainCategory, mainMap.get(item.mainCategory) + 1);
-  }
-  return [...departments.entries()].map(([department, mainMap]) => `<article class="overview-card"><p class="eyebrow">${escapeHtml(department)}</p><h3>${escapeHtml(department)} katalogu</h3><div class="overview-list">${[...mainMap.entries()].map(([mainCategory, count]) => `<div class="overview-row"><strong>${escapeHtml(mainCategory)}</strong><span>${count} urun</span></div>`).join("")}</div></article>`).join("");
-}
-
-function makeReadableLabel(value) {
-  return String(value).split("-").filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1)).join(" ");
-}
-
-function layout(title, description, content, options = {}) {
-  const appConfig = {
-    page: options.page || "home",
-    brandSlug: options.brandSlug || "",
-    supabaseUrl,
-    supabaseAnonKey,
-    productsTable,
-    brandsTable,
-    comparisonTable,
-  };
-
+function layout(title, description, content) {
   return `<!doctype html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=${assetVersion}">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css?v=${assetVersion}">
 </head>
-<body data-page="${escapeHtml(appConfig.page)}" data-brand-slug="${escapeHtml(appConfig.brandSlug)}">
-  ${content}
-  <script>window.__APP_CONFIG__=${serializeForScript(appConfig)};</script>
-  <script src="/app.js?v=${assetVersion}"></script>
+<body>
+${content}
+<script src="/app.js?v=${assetVersion}" defer></script>
 </body>
 </html>`;
 }
 
-function buildClientScript() {
-  return `(() => {
-  const searchInput = document.getElementById('search');
-  const brandFilter = document.getElementById('brand-filter');
-  const departmentFilter = document.getElementById('department-filter');
-  const mainCategoryFilter = document.getElementById('main-category-filter');
-  const subCategoryFilter = document.getElementById('sub-category-filter');
-  const cards = [...document.querySelectorAll('#product-grid .product-card')];
-  const resultCount = document.getElementById('result-count');
-  const emptyState = document.getElementById('empty-state');
-  if (!cards.length || !searchInput || !brandFilter || !departmentFilter || !mainCategoryFilter || !subCategoryFilter || !resultCount || !emptyState) return;
-  const normalize = (value) => String(value || '').toLowerCase().replace(/[ı]/g, 'i').replace(/[ğ]/g, 'g').replace(/[ü]/g, 'u').replace(/[ş]/g, 's').replace(/[ö]/g, 'o').replace(/[ç]/g, 'c').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();
-  const applyFilters = () => {
-    const search = normalize(searchInput.value);
-    const brand = brandFilter.value;
-    const department = departmentFilter.value;
-    const mainCategory = mainCategoryFilter.value;
-    const subCategory = subCategoryFilter.value;
-    let visible = 0;
-    for (const card of cards) {
-      const show = (!search || (card.dataset.search || '').includes(search))
-        && (!brand || card.dataset.brand === brand)
-        && (!department || card.dataset.department === department)
-        && (!mainCategory || card.dataset.mainCategory === mainCategory)
-        && (!subCategory || card.dataset.subCategory === subCategory);
-      card.hidden = !show;
-      if (show) visible += 1;
-    }
-    resultCount.textContent = String(visible);
-    emptyState.classList.toggle('hidden', visible !== 0);
-  };
-  searchInput.addEventListener('input', applyFilters);
-  brandFilter.addEventListener('change', applyFilters);
-  departmentFilter.addEventListener('change', applyFilters);
-  mainCategoryFilter.addEventListener('change', applyFilters);
-  subCategoryFilter.addEventListener('change', applyFilters);
-})();`;
-}
-
-function buildLiveClientScript({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }) {
-  const clientConfig = JSON.stringify({ supabaseUrl, supabaseAnonKey, productsTable, brandsTable, comparisonTable }).replace(/</g, "\\u003c");
-  return `(() => {
-  const config = Object.assign(${clientConfig}, window.__APP_CONFIG__ || {});
-  const page = document.body.dataset.page || config.page || 'home';
-  const currentBrandSlug = document.body.dataset.brandSlug || config.brandSlug || '';
-  const normalize = (value) => String(value || '').toLocaleLowerCase('tr-TR').replace(/[Ä±ı]/g, 'i').replace(/[ÄŸğ]/g, 'g').replace(/[Ã¼ü]/g, 'u').replace(/[ÅŸş]/g, 's').replace(/[Ã¶ö]/g, 'o').replace(/[Ã§ç]/g, 'c').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\s+/g, ' ').trim();
-  const slugify = (value) => normalize(value).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const escapeHtml = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-  const formatPrice = (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(Number(value) || 0);
-  const uniqueOptions = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
-  const makeReadableLabel = (value) => String(value || '').split('-').filter(Boolean).map((part) => part.charAt(0).toLocaleUpperCase('tr-TR') + part.slice(1)).join(' ');
-
-  const mapBrand = (row) => ({ slug: row.slug, name: row.name, color: row.color || '#111827', website: row.website || '#', segment: row.segment || '' });
-  const mapProduct = (row, brandMap) => {
-    const brandSlug = row.brandSlug || row.brand_slug || '';
-    return {
-      id: row.id,
-      brandSlug,
-      title: row.title || '',
-      department: row.department || '',
-      mainCategory: row.mainCategory || row.main_category || '',
-      subCategory: row.subCategory || row.sub_category || '',
-      productType: row.productType || row.product_type || '',
-      category: row.category || '',
-      gender: row.gender || '',
-      fit: row.fit || '',
-      color: row.color || '',
-      productCode: row.productCode || row.product_code || '',
-      comparisonKey: row.comparisonKey || row.comparison_key || row.id,
-      image: row.image || '',
-      price: Number(row.price) || 0,
-      previousPrice: Number(row.previousPrice || row.previous_price) || Number(row.price) || 0,
-      discountRate: Number(row.discountRate || row.discount_rate) || 0,
-      sourceUrl: row.sourceUrl || row.source_url || '',
-      materialSummary: row.materialSummary || row.material_summary || 'Materyal bilgisi yok',
-      searchText: normalize(row.searchText || row.search_text || [row.title, row.department, row.mainCategory, row.subCategory, row.productType, row.color].join(' ')),
-      brand: brandMap.get(brandSlug) || { slug: brandSlug, name: brandSlug || 'Marka', color: '#111827', website: '#', segment: '' },
-    };
-  };
-
-  const renderBrandCard = (brand) => \`<a class="brand-card" href="/brand/\${brand.slug}/" style="--brand:\${escapeHtml(brand.color)}"><span class="brand-dot"></span><strong>\${escapeHtml(brand.name)}</strong><small>\${escapeHtml(brand.segment || '')}</small></a>\`;
-  const renderProductCard = (item) => \`<article class="product-card" data-search="\${escapeHtml(item.searchText)}" data-brand="\${escapeHtml(item.brandSlug)}" data-department="\${escapeHtml(slugify(item.department))}" data-main-category="\${escapeHtml(slugify(item.mainCategory))}" data-sub-category="\${escapeHtml(slugify(item.subCategory))}"><img src="\${escapeHtml(item.image)}" alt="\${escapeHtml(item.title)}"><div class="product-body"><div class="badge-row"><span class="badge" style="background:\${escapeHtml(item.brand.color)}14;color:\${escapeHtml(item.brand.color)}">\${escapeHtml(item.brand.name)}</span><span class="badge">\${escapeHtml(item.department)}</span><span class="badge">\${escapeHtml(item.mainCategory)}</span>\${item.discountRate > 0 ? \`<span class="badge accent">%\${item.discountRate} indirim</span>\` : ''}</div><h3>\${escapeHtml(item.title)}</h3><p>\${escapeHtml(item.subCategory)} · \${escapeHtml(item.productType || item.fit)} · \${escapeHtml(item.gender)}</p><div class="price-row"><strong>\${formatPrice(item.price)}</strong>\${item.previousPrice > item.price ? \`<s>\${formatPrice(item.previousPrice)}</s>\` : ''}</div><div class="meta-stack"><small><strong>Taksonomi:</strong> \${escapeHtml(item.category)}</small><small><strong>Materyal:</strong> \${escapeHtml(item.materialSummary)}</small><small><strong>Urun kodu:</strong> \${escapeHtml(item.productCode || '-')}</small></div>\${item.sourceUrl ? \`<a class="source-link" href="\${escapeHtml(item.sourceUrl)}">Kaynak urune git</a>\` : ''}</div></article>\`;
-  const renderComparisonCard = (group) => \`<article class="comparison-card"><div class="section-head tight"><div><p class="eyebrow">\${escapeHtml(group.department)}</p><h3>\${escapeHtml(group.label)}</h3></div><small>\${group.items.length} marka</small></div><p class="compare-meta">\${escapeHtml(group.mainCategory)} · \${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>\${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">\${group.items.map((item, index) => \`<div class="compare-row \${index === 0 ? 'winner' : ''}"><strong>\${escapeHtml(item.brand.name)}</strong><span>\${formatPrice(item.price)}</span><small>\${escapeHtml(item.materialSummary)}</small></div>\`).join('')}</div></article>\`;
-
-  const renderProductCardEditorial = (item) => \`<article class="product-card" data-search="\${escapeHtml(item.searchText)}" data-brand="\${escapeHtml(item.brandSlug)}" data-department="\${escapeHtml(slugify(item.department))}" data-main-category="\${escapeHtml(slugify(item.mainCategory))}" data-sub-category="\${escapeHtml(slugify(item.subCategory))}"><div class="product-media"><img src="\${escapeHtml(item.image)}" alt="\${escapeHtml(item.title)}"><div class="product-overlay"><span class="overlay-brand" style="background:\${escapeHtml(item.brand.color)}">\${escapeHtml(item.brand.name)}</span>\${item.discountRate > 0 ? \`<span class="overlay-sale">%\${item.discountRate}</span>\` : ''}</div></div><div class="product-body"><div class="badge-row"><span class="badge">\${escapeHtml(item.department)}</span><span class="badge">\${escapeHtml(item.mainCategory)}</span><span class="badge">\${escapeHtml(item.subCategory)}</span></div><h3>\${escapeHtml(item.title)}</h3><p>\${escapeHtml(item.productType || item.fit || item.subCategory)} · \${escapeHtml(item.gender || 'Genel koleksiyon')}</p><div class="price-row"><strong>\${formatPrice(item.price)}</strong>\${item.previousPrice > item.price ? \`<s>\${formatPrice(item.previousPrice)}</s>\` : ''}</div><div class="material-panel"><span>Materyal</span><strong>\${escapeHtml(item.materialSummary)}</strong></div><div class="meta-stack"><small><strong>Taksonomi:</strong> \${escapeHtml(item.category)}</small><small><strong>Urun kodu:</strong> \${escapeHtml(item.productCode || '-')}</small></div><div class="card-footer"><span class="product-signature">\${escapeHtml(item.brand.name)} secimi</span>\${item.sourceUrl ? \`<a class="source-link" href="\${escapeHtml(item.sourceUrl)}">Urunu ac</a>\` : ''}</div></div></article>\`;
-  const renderComparisonCardEditorial = (group) => \`<article class="comparison-card"><div class="compare-card-top"><div><p class="eyebrow">\${escapeHtml(group.department)}</p><h3>\${escapeHtml(group.label)}</h3></div><span class="compare-chip">\${group.items.length} marka</span></div><p class="compare-meta">\${escapeHtml(group.mainCategory)} · \${escapeHtml(group.subCategory)} · En dusuk fiyat: <strong>\${formatPrice(group.bestPrice?.price || 0)}</strong></p><div class="compare-list">\${group.items.map((item, index) => \`<div class="compare-row \${index === 0 ? 'winner' : ''}"><div class="compare-row-main"><span class="compare-rank">\${index + 1}</span><div><strong>\${escapeHtml(item.brand.name)}</strong><small>\${escapeHtml(item.materialSummary)}</small></div></div><div class="compare-row-side"><span>\${formatPrice(item.price)}</span><small>\${escapeHtml(item.productType || item.fit || item.subCategory)}</small></div></div>\`).join('')}</div></article>\`;
-
-  const buildCategoryOverview = (items) => {
-    const departments = new Map();
-    for (const item of items) {
-      if (!departments.has(item.department)) departments.set(item.department, new Map());
-      const mainMap = departments.get(item.department);
-      if (!mainMap.has(item.mainCategory)) mainMap.set(item.mainCategory, 0);
-      mainMap.set(item.mainCategory, mainMap.get(item.mainCategory) + 1);
-    }
-    return [...departments.entries()].map(([department, mainMap]) => \`<article class="overview-card"><p class="eyebrow">\${escapeHtml(department)}</p><h3>\${escapeHtml(department)} katalogu</h3><div class="overview-list">\${[...mainMap.entries()].map(([mainCategory, count]) => \`<div class="overview-row"><strong>\${escapeHtml(mainCategory)}</strong><span>\${count} urun</span></div>\`).join('')}</div></article>\`).join('');
-  };
-
-  const fillSelect = (element, values, placeholder) => {
-    if (!element) return;
-    const current = element.value;
-    element.innerHTML = \`<option value="">\${placeholder}</option>\${values.map((value) => \`<option value="\${escapeHtml(slugify(value))}">\${escapeHtml(value)}</option>\`).join('')}\`;
-    if ([...element.options].some((option) => option.value === current)) element.value = current;
-  };
-
-  async function fetchRows(table, query) {
-    const response = await fetch(\`\${config.supabaseUrl}/rest/v1/\${table}?\${query}\`, {
-      headers: { apikey: config.supabaseAnonKey, Authorization: \`Bearer \${config.supabaseAnonKey}\` },
-    });
-    if (!response.ok) throw new Error(\`\${table} \${response.status}\`);
-    return response.json();
-  }
-
-  async function fetchCatalog() {
-    const [brandRows, productRows, comparisonRows] = await Promise.all([
-      fetchRows(config.brandsTable, 'select=slug,name,color,website,segment,priority,branches'),
-      fetchRows(config.productsTable, 'select=*&order=price.asc&limit=1000'),
-      fetchRows(config.comparisonTable, 'select=*&order=lowest_price.asc&limit=1000'),
-    ]);
-    const brands = brandRows.map(mapBrand);
-    const brandMap = new Map(brands.map((brand) => [brand.slug, brand]));
-    const products = productRows.map((row) => mapProduct(row, brandMap)).sort((a, b) => a.price - b.price);
-    const comparisonGroups = comparisonRows.map((row) => {
-      const items = Array.isArray(row.items) ? row.items.map((item) => mapProduct(item, brandMap)).sort((a, b) => a.price - b.price) : [];
-      return { comparisonKey: row.comparison_key || row.id, label: makeReadableLabel(row.comparison_key || row.id), department: items[0]?.department || 'Diger', mainCategory: items[0]?.mainCategory || 'Diger', subCategory: items[0]?.subCategory || 'Diger', items, bestPrice: items[0] || null };
-    });
-    return { brands, products, comparisonGroups };
-  }
-
-  function attachFilters() {
-    const searchInput = document.getElementById('search');
-    const brandFilter = document.getElementById('brand-filter');
-    const departmentFilter = document.getElementById('department-filter');
-    const mainCategoryFilter = document.getElementById('main-category-filter');
-    const subCategoryFilter = document.getElementById('sub-category-filter');
-    const resultCount = document.getElementById('result-count');
-    const emptyState = document.getElementById('empty-state');
-    if (!searchInput || !brandFilter || !departmentFilter || !mainCategoryFilter || !subCategoryFilter || !resultCount || !emptyState) return;
-    const applyFilters = () => {
-      const cards = [...document.querySelectorAll('#product-grid .product-card')];
-      const search = normalize(searchInput.value);
-      const brand = brandFilter.value;
-      const department = departmentFilter.value;
-      const mainCategory = mainCategoryFilter.value;
-      const subCategory = subCategoryFilter.value;
-      let visible = 0;
-      for (const card of cards) {
-        const show = (!search || (card.dataset.search || '').includes(search))
-          && (!brand || card.dataset.brand === brand)
-          && (!department || card.dataset.department === department)
-          && (!mainCategory || card.dataset.mainCategory === mainCategory)
-          && (!subCategory || card.dataset.subCategory === subCategory);
-        card.hidden = !show;
-        if (show) visible += 1;
-      }
-      resultCount.textContent = String(visible);
-      emptyState.classList.toggle('hidden', visible !== 0);
-    };
-    searchInput.oninput = applyFilters;
-    brandFilter.onchange = applyFilters;
-    departmentFilter.onchange = applyFilters;
-    mainCategoryFilter.onchange = applyFilters;
-    subCategoryFilter.onchange = applyFilters;
-    applyFilters();
-  }
-
-  function renderHome(data) {
-    const featured = data.products.slice().sort((a, b) => (b.discountRate - a.discountRate) || (a.price - b.price)).slice(0, 8);
-    const departments = uniqueOptions(data.products.map((item) => item.department));
-    const mainCategories = uniqueOptions(data.products.map((item) => item.mainCategory));
-    const subCategories = uniqueOptions(data.products.map((item) => item.subCategory));
-    const metricBrand = document.getElementById('metric-brand-count');
-    const metricProduct = document.getElementById('metric-product-count');
-    const metricGroup = document.getElementById('metric-group-count');
-    const groupCount = document.getElementById('comparison-group-count');
-    if (metricBrand) metricBrand.textContent = String(data.brands.length);
-    if (metricProduct) metricProduct.textContent = String(data.products.length);
-    if (metricGroup) metricGroup.textContent = String(data.comparisonGroups.length);
-    if (groupCount) groupCount.textContent = String(data.comparisonGroups.length);
-    const overview = document.getElementById('overview-grid');
-    if (overview) overview.innerHTML = buildCategoryOverview(data.products);
-    const ribbon = document.getElementById('category-ribbon');
-    if (ribbon) ribbon.innerHTML = subCategories.map((value) => \`<span class="category-pill">\${escapeHtml(value)}</span>\`).join('');
-    const comparisonGrid = document.getElementById('comparison-grid');
-    if (comparisonGrid) comparisonGrid.innerHTML = data.comparisonGroups.map(renderComparisonCardEditorial).join('');
-    const featuredGrid = document.getElementById('featured-grid');
-    if (featuredGrid) featuredGrid.innerHTML = featured.map(renderProductCardEditorial).join('');
-    const productGrid = document.getElementById('product-grid');
-    if (productGrid) productGrid.innerHTML = data.products.map(renderProductCardEditorial).join('');
-    const brandGrid = document.getElementById('brand-grid');
-    if (brandGrid) brandGrid.innerHTML = data.brands.map(renderBrandCard).join('');
-    fillSelect(document.getElementById('department-filter'), departments, 'Tum departmanlar');
-    fillSelect(document.getElementById('main-category-filter'), mainCategories, 'Tum ana kategoriler');
-    fillSelect(document.getElementById('sub-category-filter'), subCategories, 'Tum alt kategoriler');
-    const brandFilter = document.getElementById('brand-filter');
-    if (brandFilter) {
-      const current = brandFilter.value;
-      brandFilter.innerHTML = \`<option value="">Tum markalar</option>\${data.brands.map((brand) => \`<option value="\${escapeHtml(brand.slug)}">\${escapeHtml(brand.name)}</option>\`).join('')}\`;
-      if ([...brandFilter.options].some((option) => option.value === current)) brandFilter.value = current;
-    }
-    attachFilters();
-  }
-
-  function renderAdmin(data) {
-    const metricBrand = document.getElementById('metric-brand-count');
-    const metricProduct = document.getElementById('metric-product-count');
-    const metricGroup = document.getElementById('metric-group-count');
-    if (metricBrand) metricBrand.textContent = String(data.brands.length);
-    if (metricProduct) metricProduct.textContent = String(data.products.length);
-    if (metricGroup) metricGroup.textContent = String(data.comparisonGroups.length);
-    const tbody = document.getElementById('admin-brand-rows');
-    if (!tbody) return;
-    tbody.innerHTML = data.brands.map((brand) => {
-      const items = data.products.filter((item) => item.brandSlug === brand.slug);
-      const best = data.comparisonGroups.filter((group) => group.bestPrice?.brandSlug === brand.slug).length;
-      return \`<tr><td>\${escapeHtml(brand.name)}</td><td>\${items.length}</td><td>\${escapeHtml(uniqueOptions(items.map((item) => item.department)).join(', ') || '-')}</td><td>\${best}</td></tr>\`;
-    }).join('');
-  }
-
-  function renderBrandPage(data) {
-    const brandProducts = data.products.filter((item) => item.brandSlug === currentBrandSlug);
-    const count = document.getElementById('brand-product-count');
-    const departments = document.getElementById('brand-departments');
-    const mainCategories = document.getElementById('brand-main-categories');
-    const grid = document.getElementById('brand-product-grid');
-    if (count) count.textContent = String(brandProducts.length);
-    if (departments) departments.textContent = uniqueOptions(brandProducts.map((item) => item.department)).join(', ') || '-';
-    if (mainCategories) mainCategories.textContent = uniqueOptions(brandProducts.map((item) => item.mainCategory)).join(', ') || '-';
-    if (grid) grid.innerHTML = brandProducts.map(renderProductCardEditorial).join('') || '<div class="empty">Bu marka icin henuz urun yok.</div>';
-  }
-
-  async function init() {
-    attachFilters();
-    if (!config.supabaseUrl || !config.supabaseAnonKey) return;
-    try {
-      const data = await fetchCatalog();
-      if (page === 'admin') renderAdmin(data);
-      else if (page === 'brand') renderBrandPage(data);
-      else renderHome(data);
-    } catch (error) {
-      console.error('Supabase live mode fallback used:', error);
-    }
-  }
-
-  init();
-})();`;
-}
-
 function buildStyles() {
-  return `:root {
-  --bg: #f7f1e8;
-  --bg-deep: #ecdfd0;
-  --surface: rgba(255, 250, 244, 0.9);
-  --surface-strong: #fffdf9;
-  --text: #241b16;
-  --muted: #8d7b6d;
-  --line: rgba(108, 82, 58, 0.14);
-  --accent: #c98a4b;
-  --accent-soft: rgba(201, 138, 75, 0.16);
-  --forest: #6f8d79;
-  --shadow: 0 30px 80px rgba(95, 69, 43, 0.12);
-  --shadow-soft: 0 12px 28px rgba(95, 69, 43, 0.08);
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  color: var(--text);
-  font-family: "Instrument Sans", sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(201, 138, 75, 0.12), transparent 24%),
-    radial-gradient(circle at 82% 12%, rgba(111, 141, 121, 0.08), transparent 18%),
-    linear-gradient(180deg, #fffdfa 0%, var(--bg) 58%, #efe2d2 100%);
-}
-a { color: inherit; text-decoration: none; }
-img { display: block; width: 100%; object-fit: cover; background: #efe2d2; }
-p, small, s { color: var(--muted); }
-.page { width: min(1280px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 88px; }
-.topbar, .logo, .nav, .hero-actions, .metric-grid, .badge-row, .price-row, .section-head, .search-shell, .hero-tags, .category-ribbon { display: flex; }
-.topbar {
-  position: sticky;
-  top: 14px;
-  z-index: 20;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 26px;
-  padding: 12px 14px;
-  border: 1px solid rgba(255,255,255,0.7);
-  border-radius: 999px;
-  background: rgba(255, 249, 242, 0.72);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow-soft);
-}
-.logo, .nav { align-items: center; gap: 14px; }
-.logo-mark {
-  display: inline-flex;
-  width: 48px;
-  height: 48px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 18px;
-  background: linear-gradient(145deg, #c98a4b, #7c5330);
-  color: white;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.logo strong, h1, h2, h3 { margin: 0; letter-spacing: -0.04em; }
-.logo strong, h2, h3 { font-family: "Cormorant Garamond", serif; }
-.logo small { display: block; margin-top: 2px; }
-.nav {
-  padding: 6px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.52);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
-  flex-wrap: wrap;
-}
-.nav a {
-  padding: 10px 16px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.nav a:hover { background: rgba(201, 138, 75, 0.08); }
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
-  gap: 26px;
-  padding: 34px;
-  border: 1px solid rgba(255,255,255,0.72);
-  border-radius: 36px;
-  background:
-    linear-gradient(135deg, rgba(255,252,248,0.96), rgba(249,239,226,0.92)),
-    radial-gradient(circle at top right, rgba(201,138,75,0.12), transparent 24%);
-  box-shadow: var(--shadow);
-}
-.hero-copy-block { display: grid; gap: 18px; align-content: start; }
-.eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-}
-h1 {
-  max-width: 7ch;
-  font-family: "Cormorant Garamond", serif;
-  font-size: clamp(38px, 5vw, 58px);
-  line-height: 0.94;
-}
-h2 { font-size: clamp(28px, 3.5vw, 42px); line-height: 0.98; }
-h3 { font-size: 34px; line-height: 0.96; }
-.hero-copy { max-width: 58ch; font-size: 16px; line-height: 1.8; }
-.hero-marquee {
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.hero-marquee span {
-  display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(108,82,58,0.1);
-  background: rgba(255,255,255,0.44);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-}
-.search-shell {
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 20px;
-  border: 1px solid rgba(108,82,58,0.12);
-  border-radius: 26px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(201,138,75,0.08));
-}
-.search-shell strong { display: block; margin-top: 4px; font-family: "Cormorant Garamond", serif; font-size: 28px; }
-.search-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); }
-.hero-tags, .category-ribbon { gap: 10px; flex-wrap: wrap; }
-.hero-tag, .category-pill, .badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 9px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(108,82,58,0.1);
-  background: rgba(255,255,255,0.56);
-  font-size: 12px;
-  font-weight: 600;
-}
-.hero-tag.muted { background: var(--accent-soft); color: var(--accent); }
-.hero-actions { gap: 12px; flex-wrap: wrap; }
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: 1px solid rgba(108,82,58,0.1);
-  background: rgba(255,255,255,0.72);
-  font-weight: 600;
-}
-.button.primary {
-  background: linear-gradient(145deg, #2b211c, #171210);
-  color: white;
-  border-color: transparent;
-}
-.hero-panel, .metric, .comparison-card, .product-card, .brand-card, .empty, .overview-card, .table-wrap {
-  border: 1px solid rgba(108,82,58,0.1);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-}
-.hero-panel, .comparison-card, .empty, .overview-card { border-radius: 28px; padding: 18px; }
-.hero-panel {
-  position: relative;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0)),
-    rgba(255, 251, 246, 0.88);
-}
-.hero-look {
-  position: relative;
-  min-height: 280px;
-  margin-bottom: 18px;
-  border-radius: 24px;
-  overflow: hidden;
-  background: #e8dcca;
-}
-.hero-look::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 20%, rgba(36,27,22,0.58) 100%);
-}
-.hero-look img {
-  height: 100%;
-  min-height: 280px;
-  transform: scale(1.04);
-}
-.hero-look-overlay {
-  position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 18px;
-  z-index: 1;
-}
-.hero-look-overlay strong {
-  display: block;
-  margin-top: 6px;
-  font-family: "Cormorant Garamond", serif;
-  font-size: 34px;
-}
-.eyebrow.inverse { color: #f7e5d5; }
-.metric-grid { gap: 12px; flex-wrap: wrap; }
-.editorial-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.metric {
-  min-height: 120px;
-  border-radius: 24px;
-  padding: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.46));
-}
-.metric span, .metric small { display: block; }
-.metric span { margin-bottom: 10px; color: var(--muted); }
-.metric strong { font-family: "Cormorant Garamond", serif; font-size: 46px; line-height: 1; }
-.metric small { margin-top: 12px; font-size: 12px; }
-.metric-small { font-size: 20px; }
-.hero-note {
-  margin-top: 14px;
-  padding: 18px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, rgba(201, 138, 75, 0.14), rgba(255,255,255,0.4));
-}
-.hero-note.soft { background: linear-gradient(135deg, rgba(111, 141, 121, 0.12), rgba(255,255,255,0.36)); }
-.brand-strip {
-  display: flex;
-  gap: 26px;
-  flex-wrap: wrap;
-  align-items: center;
-  padding: 18px 12px;
-  margin-top: 18px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.brand-strip-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-weight: 600;
-}
-.brand-strip-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-}
-.category-ribbon { margin-top: 18px; }
-.category-pill { background: rgba(255,255,255,0.72); }
-.overview-grid, .comparison-grid, .product-grid, .brand-grid { display: grid; gap: 20px; }
-.overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 28px; }
-.overview-card h3 { font-size: 30px; }
-.overview-list, .compare-list, .meta-stack { display: grid; gap: 10px; margin-top: 14px; }
-.overview-row, .compare-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-.filters {
-  display: grid;
-  grid-template-columns: 2fr repeat(4, 1fr);
-  gap: 16px;
-  margin-top: 28px;
-  padding: 20px;
-  border-radius: 30px;
-  border: 1px solid rgba(108,82,58,0.1);
-  background: rgba(255,255,255,0.5);
-  box-shadow: var(--shadow-soft);
-}
-.filters label { display: grid; gap: 8px; }
-.filters span { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.filters input, .filters select {
-  width: 100%;
-  height: 52px;
-  border-radius: 16px;
-  border: 1px solid rgba(108,82,58,0.1);
-  padding: 0 14px;
-  font: inherit;
-  background: rgba(255,255,255,0.8);
-  color: var(--text);
-}
-.section { margin-top: 40px; }
-.section-head { align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-.section-head h2 { max-width: 12ch; }
-.tight { align-items: start; margin-bottom: 14px; }
-.comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.comparison-card { padding: 22px; }
-.compare-card-top {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 10px;
-}
-.compare-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(36,27,22,0.08);
-  font-size: 12px;
-  font-weight: 600;
-}
-.compare-meta { margin: 0 0 14px; line-height: 1.6; }
-.compare-row {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 0 0;
-}
-.compare-row-main, .compare-row-side { display: flex; gap: 12px; }
-.compare-row-main { align-items: start; }
-.compare-row-main div, .compare-row-side { display: grid; gap: 4px; }
-.compare-row-side { justify-items: end; text-align: right; }
-.compare-rank {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: rgba(32, 24, 21, 0.08);
-  font-weight: 700;
-  flex: 0 0 auto;
-}
-.compare-row.winner { color: var(--forest); }
-.product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.product-grid-featured { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.brand-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.product-card, .brand-card {
-  border-radius: 28px;
-  overflow: hidden;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-}
-.product-card:hover, .brand-card:hover, .comparison-card:hover { transform: translateY(-6px); box-shadow: 0 26px 54px rgba(95, 69, 43, 0.16); }
-.product-media { position: relative; }
-.product-card img { height: 260px; padding: 34px; background: linear-gradient(180deg, rgba(255,255,255,0.2), transparent); }
-.product-overlay {
-  position: absolute;
-  inset: 14px 14px auto 14px;
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
-}
-.overlay-brand, .overlay-sale {
-  display: inline-flex;
-  align-items: center;
-  padding: 9px 12px;
-  border-radius: 999px;
-  color: white;
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.16);
-}
-.overlay-sale { background: rgba(32, 24, 21, 0.82); }
-.product-body { padding: 20px; }
-.badge-row { gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.badge { padding: 8px 12px; background: rgba(36, 27, 22, 0.06); }
-.badge.accent { background: rgba(143, 91, 52, 0.14); color: var(--accent); }
-.product-body h3 { font-size: 32px; margin-bottom: 8px; }
-.price-row { gap: 12px; align-items: baseline; margin-top: 16px; }
-.price-row strong { font-family: "Cormorant Garamond", serif; font-size: 42px; line-height: 1; }
-.material-panel {
-  display: grid;
-  gap: 6px;
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(201, 138, 75, 0.16), rgba(255,255,255,0.7));
-}
-.material-panel span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
-.material-panel strong { font-size: 15px; line-height: 1.6; }
-.meta-stack { padding-top: 14px; border-top: 1px solid var(--line); }
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 16px;
-}
-.product-signature {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-}
-.source-link { display: inline-flex; margin-top: 16px; color: var(--forest); font-weight: 700; }
-.brand-card {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  padding: 20px;
-  min-height: 140px;
-}
-.brand-card strong { font-family: "Cormorant Garamond", serif; font-size: 28px; }
-.brand-dot { width: 14px; height: 14px; border-radius: 999px; background: var(--brand, #111827); box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand, #111827) 18%, transparent); }
-.table-wrap { overflow-x: auto; border-radius: 28px; }
-table { width: 100%; border-collapse: collapse; min-width: 700px; }
-th, td { padding: 16px 18px; text-align: left; border-bottom: 1px solid var(--line); }
-tbody tr:last-child td { border-bottom: 0; }
-.empty { padding: 24px; }
-.hidden { display: none; }
-@media (max-width: 1100px) {
-  .hero,
-  .overview-grid,
-  .comparison-grid,
-  .product-grid,
-  .product-grid-featured,
-  .brand-grid,
-  .filters,
-  .editorial-metrics { grid-template-columns: 1fr 1fr; }
-  .search-shell { flex-direction: column; align-items: flex-start; }
-}
-@media (max-width: 720px) {
-  .page { width: min(100% - 18px, 1280px); padding-top: 16px; }
-  .topbar { position: static; border-radius: 28px; }
-  .topbar, .hero, .overview-grid, .comparison-grid, .product-grid, .product-grid-featured, .brand-grid, .filters, .editorial-metrics { grid-template-columns: 1fr; }
-  .topbar { align-items: flex-start; flex-direction: column; }
-  h1, .section-head h2 { max-width: none; }
-  .nav { width: 100%; }
-}
-`;
+  return `*,*::before,*::after{box-sizing:border-box}
+:root{--bg:#f7f7fa;--surface:#fff;--text:#0f172a;--muted:#64748b;--line:#e5e7eb;--accent:#e11d48;--radius:14px;--shadow:0 2px 10px rgba(15,23,42,.06)}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:var(--bg);line-height:1.5}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%;height:auto}
+h1,h2,h3{margin:0;letter-spacing:-.02em;line-height:1.15}
+h1{font-size:clamp(28px,4vw,44px);font-weight:800}
+h2{font-size:24px;font-weight:700}
+h3{font-size:16px;font-weight:600}
+p{margin:0}
+.muted{color:var(--muted);font-size:13px}
+.page{width:min(1200px,calc(100% - 32px));margin:0 auto;padding:16px 0 64px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px;margin-bottom:24px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#e11d48,#be123c);color:#fff;font-weight:800;font-size:13px;letter-spacing:.05em}
+.logo strong{display:block;font-size:15px}
+.logo small{color:var(--muted);font-size:12px}
+.nav{display:flex;gap:4px}
+.nav a{padding:8px 14px;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted)}
+.nav a:hover{background:#f1f5f9;color:var(--text)}
+.nav a.active{background:#f1f5f9;color:var(--text);font-weight:600}
+.hero{background:var(--surface);border-radius:var(--radius);padding:36px;margin-bottom:32px;box-shadow:var(--shadow)}
+.hero.compact{padding:24px}
+.hero .eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:700;color:var(--accent);margin-bottom:10px}
+.hero-sub{color:var(--muted);max-width:60ch;margin-top:12px;font-size:15px}
+.hero-stats{display:flex;gap:32px;margin-top:20px}
+.hero-stats strong{display:block;font-size:28px;font-weight:800}
+.hero-stats span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.hero-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px;background:#f1f5f9;border:1px solid var(--line)}
+.btn:hover{background:#e2e8f0}
+.btn.primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn.primary:hover{background:#1e293b}
+.market-hero{border-left:6px solid var(--accent)}
+.section{margin-top:40px}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+.section-head small{color:var(--muted);font-size:12px}
+.market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.market-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 16px;background:var(--surface);border-radius:var(--radius);text-align:center;box-shadow:var(--shadow);border-top:4px solid var(--accent);transition:transform .15s}
+.market-card:hover{transform:translateY(-3px)}
+.market-mark{display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:16px}
+.market-card strong{font-size:15px}
+.market-card small{color:var(--muted);font-size:12px}
+.catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.catalog-card{display:block;padding:20px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border-left:4px solid var(--accent);transition:transform .15s}
+.catalog-card:hover{transform:translateY(-3px)}
+.catalog-card-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.market-dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.catalog-card h3{font-size:17px;margin:6px 0}
+.catalog-card p{color:var(--muted);font-size:13px}
+.catalog-card small{display:block;margin-top:10px;color:var(--muted);font-size:12px;font-weight:600}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.product-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .15s}
+.product-card:hover{transform:translateY(-3px)}
+.product-img{aspect-ratio:1/1;background:#f1f5f9;overflow:hidden}
+.product-img img{width:100%;height:100%;object-fit:contain;padding:10px}
+.product-img.placeholder{background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
+.product-body{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.product-tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#f1f5f9;color:var(--muted)}
+.tag.market-tag{background:var(--accent);color:#fff}
+.tag.discount{background:#fef3c7;color:#92400e}
+.product-card h3{font-size:14px;line-height:1.35;font-weight:600}
+.price-row{display:flex;align-items:baseline;gap:8px;margin-top:auto}
+.price-row strong{font-size:20px;font-weight:800;color:var(--text)}
+.price-row s{color:var(--muted);font-size:13px}
+.product-link{font-size:12px;color:var(--accent);font-weight:600;margin-top:6px}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;background:var(--surface);padding:20px;border-radius:var(--radius);box-shadow:var(--shadow);margin-top:24px}
+.filters label{display:grid;gap:6px}
+.filters span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.filters input,.filters select{width:100%;height:42px;border-radius:8px;border:1px solid var(--line);padding:0 12px;font:inherit;background:#fff;color:var(--text)}
+.empty{padding:20px;text-align:center;color:var(--muted);background:var(--surface);border-radius:var(--radius)}
+.hidden{display:none!important}
+.footer{margin-top:60px;padding:24px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+.footer small{font-size:11px}
+@media (max-width:720px){
+  .topbar{flex-direction:column;align-items:stretch}
+  .nav{justify-content:space-between;flex-wrap:wrap}
+  .hero{padding:24px}
+  .hero-stats{gap:20px}
+  .filters{grid-template-columns:1fr}
+}`;
 }
 
-function buildRobots() {
-  return `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}/sitemap.xml\n`;
+function buildClientJs() {
+  return `(()=>{
+const s=document.getElementById('search');const m=document.getElementById('market-filter');const c=document.getElementById('category-filter');const g=document.getElementById('product-grid');const n=document.getElementById('count');const e=document.getElementById('empty');if(!g)return;
+const norm=v=>String(v||'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();
+const apply=()=>{const q=s?norm(s.value):'';const mm=m?m.value:'';const cc=c?c.value:'';let v=0;for(const card of g.children){const show=(!q||(card.dataset.search||'').includes(q))&&(!mm||card.dataset.market===mm)&&(!cc||card.dataset.category===cc);card.classList.toggle('hidden',!show);if(show)v++;}if(n)n.textContent=v;if(e)e.classList.toggle('hidden',v!==0);};
+[s,m,c].forEach(el=>el&&el.addEventListener('input',apply));[s,m,c].forEach(el=>el&&el.addEventListener('change',apply));
+})();`;
 }
 
-function buildSitemap(brands) {
-  const urls = [`${siteUrl}/`, `${siteUrl}/admin.html`, ...brands.map((brand) => `${siteUrl}/brand/${brand.slug}/`)];
-  const items = urls.map((url) => `<url><loc>${escapeHtml(url)}</loc><lastmod>${new Date().toISOString()}</lastmod></url>`).join("");
+function buildSitemap() {
+  const urls = [`${siteUrl}/`, `${siteUrl}/urunler/`];
+  for (const m of orderedMarkets) {
+    urls.push(`${siteUrl}/market/${m.id}/`);
+    const cats = catalogsByMarket.get(m.id) || [];
+    for (const c of cats) urls.push(`${siteUrl}/market/${m.id}/${c.id}/`);
+  }
+  const items = urls.map((u) => `<url><loc>${escapeHtml(u)}</loc><lastmod>${new Date().toISOString()}</lastmod></url>`).join("");
   return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${items}</urlset>`;
 }
 
-function formatPrice(value) {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(value || 0);
+function groupBy(rows, key) {
+  const map = new Map();
+  for (const row of rows) {
+    const k = row[key];
+    if (!k) continue;
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(row);
+  }
+  return map;
 }
 
-function uniqueOptions(values) {
-  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+function orderMarkets(list, preferred) {
+  const preferredSet = new Map(preferred.map((id, i) => [id, i]));
+  return list.slice().sort((a, b) => {
+    const ai = preferredSet.has(a.id) ? preferredSet.get(a.id) : 1000;
+    const bi = preferredSet.has(b.id) ? preferredSet.get(b.id) : 1000;
+    if (ai !== bi) return ai - bi;
+    return (a.name || a.id).localeCompare(b.name || b.id, "tr");
+  });
 }
 
-function slugify(value) {
-  return String(value ?? "").toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+function marketLabel(m) {
+  if (!m) return "";
+  return siteConfig.marketLabels[m.id] || m.name || m.id;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+function marketColor(id) {
+  return siteConfig.marketColors[id] || "#e11d48";
 }
 
-function serializeForScript(value) {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+function dateRange(c) {
+  if (!c?.week_start || !c?.week_end) return "";
+  const fmt = (d) => new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+  return `${fmt(c.week_start)} – ${fmt(c.week_end)}`;
+}
+
+function formatPrice(v) {
+  if (v == null || v === "") return "—";
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(Number(v) || 0);
+}
+
+function normalize(v) {
+  return String(v || "").toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function escapeHtml(v) {
+  return String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
