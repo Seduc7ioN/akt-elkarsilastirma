@@ -229,6 +229,9 @@ function renderComment(c) {
 function renderCatalog(market, catalog) {
   const catProducts = productsByCatalog.get(catalog.id) || [];
   const color = marketColor(market.id);
+  const pages = Array.isArray(catalog.pages) ? catalog.pages : [];
+  const coverImage = catalog.cover_image || pages[0] || catProducts.find((p) => p.image)?.image || "";
+  const galleryProducts = catProducts.filter((p) => p.image);
 
   return layout(
     `${marketLabel(market)} ${catalogTitle(catalog)} kataloğu`,
@@ -236,13 +239,30 @@ function renderCatalog(market, catalog) {
     `<main class="page">
       ${renderHeader("market")}
 
-      <section class="hero market-hero" style="--accent:${color}">
+      <section class="hero market-hero catalog-hero" style="--accent:${color}">
         <div>
-          <p class="eyebrow"><a href="/market/${market.id}/">${escapeHtml(marketLabel(market))}</a> · haftalık katalog</p>
+          <p class="eyebrow"><a href="/market/${market.id}/">${escapeHtml(marketLabel(market))}</a> · haftalık broşür</p>
           <h1>${escapeHtml(catalogTitle(catalog))}</h1>
           <p class="hero-sub">${catProducts.length} ürün · ${dateRange(catalog)}</p>
         </div>
+        ${coverImage ? `<div class="catalog-cover"><img src="${escapeHtml(coverImage)}" alt="${escapeHtml(marketLabel(market))} broşür kapağı" loading="lazy"></div>` : ""}
       </section>
+
+      ${pages.length ? `
+      <section class="section">
+        <div class="section-head"><h2>Broşür sayfaları</h2><small>${pages.length} sayfa</small></div>
+        <div class="brochure-pages">
+          ${pages.map((src, i) => `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="brochure-page"><img src="${escapeHtml(src)}" alt="Sayfa ${i + 1}" loading="lazy"><span>${i + 1}</span></a>`).join("")}
+        </div>
+      </section>` : ""}
+
+      ${galleryProducts.length ? `
+      <section class="section">
+        <div class="section-head"><h2>Broşür galerisi</h2><small>${galleryProducts.length} görsel · tıkla detay</small></div>
+        <div class="brochure-gallery">
+          ${galleryProducts.slice(0, 60).map(renderGalleryTile).join("")}
+        </div>
+      </section>` : ""}
 
       <section class="section">
         <div class="section-head"><h2>Katalog ürünleri</h2><small>${catProducts.length} ürün</small></div>
@@ -372,6 +392,21 @@ function renderCatalogCard(market, catalog, opts = {}) {
     <p>${dateRange(catalog)}</p>
     <small>${count} ürün</small>
   </a>`;
+}
+
+function renderGalleryTile(p) {
+  const market = marketById.get(p.market_id);
+  const color = marketColor(p.market_id);
+  const payload = JSON.stringify({
+    id: p.id, name: p.name || "", image: p.image || "", price: p.price ?? null,
+    oldPrice: p.old_price ?? null, discount: p.discount_pct || 0, category: p.category || "",
+    market: marketLabel(market), marketId: p.market_id || "", color, url: p.url || "", badge: p.badge || "",
+  });
+  return `<button type="button" class="gallery-tile product-card" data-product="${escapeHtml(payload)}" data-category="${escapeHtml(p.category || "")}" data-market="${escapeHtml(p.market_id || "")}" style="--accent:${color}">
+    <img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name || "")}" loading="lazy">
+    ${p.discount_pct ? `<span class="gallery-discount">%${p.discount_pct}</span>` : ""}
+    <span class="gallery-price">${formatPrice(p.price)}</span>
+  </button>`;
 }
 
 function renderProductCard(p) {
@@ -567,6 +602,20 @@ p{margin:0}
 .btn.primary{background:var(--text);color:#fff;border-color:var(--text)}
 .btn.primary:hover{background:#1e293b}
 .market-hero{border-left:6px solid var(--accent)}
+.catalog-hero{display:grid;grid-template-columns:1.5fr 1fr;gap:24px;align-items:center}
+.catalog-cover{border-radius:var(--radius);overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;box-shadow:var(--shadow)}
+.catalog-cover img{width:100%;height:100%;object-fit:cover}
+@media (max-width:720px){.catalog-hero{grid-template-columns:1fr}.catalog-cover{aspect-ratio:4/3;max-height:320px}}
+.brochure-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.brochure-page{position:relative;border-radius:10px;overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;display:block;box-shadow:var(--shadow)}
+.brochure-page img{width:100%;height:100%;object-fit:cover}
+.brochure-page span{position:absolute;bottom:6px;right:8px;background:rgba(15,23,42,.7);color:#fff;font-size:11px;padding:2px 7px;border-radius:999px;font-weight:600}
+.brochure-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.gallery-tile{position:relative;border:0;padding:0;background:#f1f5f9;border-radius:10px;overflow:hidden;aspect-ratio:1/1;cursor:pointer;transition:transform .15s;box-shadow:0 1px 4px rgba(15,23,42,.06)}
+.gallery-tile:hover{transform:scale(1.03);z-index:1;box-shadow:var(--shadow)}
+.gallery-tile img{width:100%;height:100%;object-fit:contain;padding:6px}
+.gallery-discount{position:absolute;top:6px;left:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:3px 7px;border-radius:999px}
+.gallery-price{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);font-size:12px;font-weight:700;padding:4px;text-align:center;color:var(--text)}
 .section{margin-top:40px}
 .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
 .section-head small{color:var(--muted);font-size:12px}
