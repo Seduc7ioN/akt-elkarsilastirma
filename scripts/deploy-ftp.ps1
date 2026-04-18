@@ -4,30 +4,30 @@ $root = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $root ".env"
 $distDir = Join-Path $root "dist"
 
-if (-not (Test-Path $envFile)) {
-  throw ".env dosyasi bulunamadi. Once .env.example dosyasini .env olarak kopyalayin."
-}
-
 if (-not (Test-Path $distDir)) {
   throw "dist klasoru bulunamadi. Once npm run build calistirin."
 }
 
 $envMap = @{}
-Get-Content $envFile | ForEach-Object {
-  $line = $_.Trim()
-  if (-not $line -or $line.StartsWith("#")) { return }
-  $parts = $line.Split("=", 2)
-  if ($parts.Length -eq 2) {
-    $key = $parts[0].Trim()
-    $value = $parts[1].Trim().Trim('"')
-    $envMap[$key] = $value
+if (Test-Path $envFile) {
+  Get-Content $envFile | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line -or $line.StartsWith("#")) { return }
+    $parts = $line.Split("=", 2)
+    if ($parts.Length -eq 2) {
+      $envMap[$parts[0].Trim()] = $parts[1].Trim().Trim('"')
+    }
   }
 }
 
 $required = @("FTP_HOST", "FTP_USER", "FTP_PASSWORD", "FTP_REMOTE_DIR")
 foreach ($key in $required) {
+  $fromEnv = [System.Environment]::GetEnvironmentVariable($key)
+  if (-not [string]::IsNullOrWhiteSpace($fromEnv)) {
+    $envMap[$key] = $fromEnv
+  }
   if (-not $envMap.ContainsKey($key) -or [string]::IsNullOrWhiteSpace($envMap[$key])) {
-    throw "$key .env icinde tanimli degil."
+    throw "$key ne .env'de ne de ortam degiskeninde tanimli."
   }
 }
 

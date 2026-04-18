@@ -9,31 +9,25 @@ on:
         default: true
         type: boolean
   schedule:
-    # Her 3 saatte bir build + deploy (Supabase'te scraper haricen veri yaziyor)
     - cron: "0 */3 * * *"
 
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      SITE_URL: ${{ secrets.SITE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Create env file
-        shell: pwsh
-        run: |
-          @"
-          SITE_URL=${{ secrets.SITE_URL }}
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-          FTP_HOST=${{ secrets.FTP_HOST }}
-          FTP_USER=${{ secrets.FTP_USER }}
-          FTP_PASSWORD=${{ secrets.FTP_PASSWORD }}
-          FTP_REMOTE_DIR=${{ secrets.FTP_REMOTE_DIR }}
-          "@ | Set-Content -Path .env -Encoding utf8
 
       - name: Build site
         shell: pwsh
