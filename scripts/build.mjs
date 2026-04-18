@@ -75,6 +75,14 @@ function renderHome() {
     .slice(0, 12);
   const recentProducts = products.slice(0, 24);
 
+  const now = Date.now();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const endingSoon = catalogs
+    .map((c) => ({ catalog: c, market: marketById.get(c.market_id), end: c.week_end ? new Date(c.week_end).getTime() : null }))
+    .filter((x) => x.market && x.end && x.end >= now && x.end - now <= weekMs)
+    .sort((a, b) => a.end - b.end)
+    .slice(0, 8);
+
   return layout(
     siteConfig.site.title,
     siteConfig.site.description,
@@ -112,6 +120,14 @@ function renderHome() {
         </div>
       </section>
 
+      ${endingSoon.length ? `
+      <section class="section">
+        <div class="section-head"><h2>Yakında bitiyor</h2><small>${endingSoon.length} katalog · 7 gün içinde</small></div>
+        <div class="catalog-grid">
+          ${endingSoon.map(({ market, catalog }) => renderCatalogCard(market, catalog, { endingSoon: true })).join("")}
+        </div>
+      </section>` : ""}
+
       ${topDiscounts.length ? `
       <section class="section">
         <div class="section-head"><h2>En yüksek indirimler</h2><small>% indirim sıralı</small></div>
@@ -128,7 +144,14 @@ function renderHome() {
       </section>
 
       ${renderFooter()}
-    </main>`
+    </main>`,
+    {
+      canonical: "/",
+      jsonLd: [
+        websiteLd(),
+        itemListLd(recentProducts, "/"),
+      ],
+    }
   );
 }
 
@@ -178,7 +201,17 @@ function renderMarket(market) {
 
       ${renderFooter()}
     </main>`,
-    { ogImage: market.website ? null : null, type: "market" }
+    {
+      type: "market",
+      canonical: `/market/${market.id}/`,
+      jsonLd: [
+        breadcrumbLd([
+          { name: "Anasayfa", path: "/" },
+          { name: marketLabel(market), path: `/market/${market.id}/` },
+        ]),
+        itemListLd(marketProducts, `/market/${market.id}/`),
+      ],
+    }
   );
 }
 
@@ -216,7 +249,19 @@ function renderCatalog(market, catalog) {
       </section>
 
       ${renderFooter()}
-    </main>`
+    </main>`,
+    {
+      type: "article",
+      canonical: `/market/${market.id}/${catalog.id}/`,
+      jsonLd: [
+        breadcrumbLd([
+          { name: "Anasayfa", path: "/" },
+          { name: marketLabel(market), path: `/market/${market.id}/` },
+          { name: catalog.period_text || dateRange(catalog) || "Katalog", path: `/market/${market.id}/${catalog.id}/` },
+        ]),
+        itemListLd(catProducts, `/market/${market.id}/${catalog.id}/`),
+      ],
+    }
   );
 }
 
@@ -234,7 +279,7 @@ function renderAllProducts() {
         <div>
           <p class="eyebrow">Arama</p>
           <h1>Tüm aktüel ürünler</h1>
-          <p class="hero-sub">${all.length} ürün listeleniyor. Ara, market veya kategoriye göre filtrele.</p>
+          <p class="hero-sub">${all.length} ürün listeleniyor. Ara, market, kategori, fiyat ve sıralamayla filtrele.</p>
         </div>
       </section>
 
@@ -242,6 +287,14 @@ function renderAllProducts() {
         <label><span>Ürün ara</span><input id="search" type="search" placeholder="süt, deterjan, şampuan..."></label>
         <label><span>Market</span><select id="market-filter"><option value="">Tüm marketler</option>${orderedMarkets.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(marketLabel(m))}</option>`).join("")}</select></label>
         <label><span>Kategori</span><select id="category-filter"><option value="">Tüm kategoriler</option>${categories.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}</select></label>
+        <label><span>Min ₺</span><input id="price-min" type="number" min="0" step="1" placeholder="0"></label>
+        <label><span>Max ₺</span><input id="price-max" type="number" min="0" step="1" placeholder="∞"></label>
+        <label><span>Sıralama</span><select id="sort">
+          <option value="recent">Son eklenen</option>
+          <option value="price-asc">Fiyat (artan)</option>
+          <option value="price-desc">Fiyat (azalan)</option>
+          <option value="discount-desc">İndirim (%)</option>
+        </select></label>
       </section>
 
       <section class="section">
@@ -253,7 +306,17 @@ function renderAllProducts() {
       </section>
 
       ${renderFooter()}
-    </main>`
+    </main>`,
+    {
+      canonical: "/urunler/",
+      jsonLd: [
+        breadcrumbLd([
+          { name: "Anasayfa", path: "/" },
+          { name: "Tüm ürünler", path: "/urunler/" },
+        ]),
+        itemListLd(all, "/urunler/"),
+      ],
+    }
   );
 }
 
@@ -288,13 +351,19 @@ function renderMarketCard(market) {
   </a>`;
 }
 
-function renderCatalogCard(market, catalog) {
+function renderCatalogCard(market, catalog, opts = {}) {
   const color = marketColor(market.id);
   const count = (productsByCatalog.get(catalog.id) || []).length;
+  let badge = "";
+  if (opts.endingSoon && catalog.week_end) {
+    const days = Math.max(0, Math.ceil((new Date(catalog.week_end).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+    badge = `<span class="tag discount">${days === 0 ? "Bugün bitiyor" : `${days} gün kaldı`}</span>`;
+  }
   return `<a class="catalog-card" href="/market/${market.id}/${catalog.id}/" style="--accent:${color}">
     <div class="catalog-card-head">
       <span class="market-dot"></span>
       <strong>${escapeHtml(marketLabel(market))}</strong>
+      ${badge}
     </div>
     <h3>${escapeHtml(catalog.period_text || dateRange(catalog))}</h3>
     <p>${dateRange(catalog)}</p>
@@ -306,7 +375,11 @@ function renderProductCard(p) {
   const market = marketById.get(p.market_id);
   const color = marketColor(p.market_id);
   const search = normalize(`${p.name || ""} ${p.category || ""} ${marketLabel(market)}`);
-  return `<article class="product-card" data-search="${escapeHtml(search)}" data-market="${escapeHtml(p.market_id || "")}" data-category="${escapeHtml(p.category || "")}" style="--accent:${color}">
+  const priceNum = Number(p.price);
+  const price = Number.isFinite(priceNum) ? priceNum : "";
+  const discount = Number(p.discount_pct) || 0;
+  const ts = p.scraped_at ? new Date(p.scraped_at).getTime() || 0 : 0;
+  return `<article class="product-card" data-search="${escapeHtml(search)}" data-market="${escapeHtml(p.market_id || "")}" data-category="${escapeHtml(p.category || "")}" data-price="${price}" data-discount="${discount}" data-ts="${ts}" style="--accent:${color}">
     ${p.image ? `<div class="product-img"><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name || "")}" loading="lazy"></div>` : `<div class="product-img placeholder"></div>`}
     <div class="product-body">
       <div class="product-tags">
@@ -328,6 +401,12 @@ function renderProductCard(p) {
 function layout(title, description, content, options = {}) {
   const type = options.type || "website";
   const ogImage = options.ogImage || `${siteUrl}/og-default.png`;
+  const canonical = options.canonical ? `${siteUrl}${options.canonical}` : siteUrl;
+  const jsonLd = options.jsonLd
+    ? (Array.isArray(options.jsonLd) ? options.jsonLd : [options.jsonLd])
+        .map((obj) => `<script type="application/ld+json">${JSON.stringify(obj).replaceAll("</", "<\\/")}</script>`)
+        .join("")
+    : "";
   return `<!doctype html>
 <html lang="tr">
 <head>
@@ -341,22 +420,87 @@ function layout(title, description, content, options = {}) {
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:image" content="${escapeHtml(ogImage)}">
-<meta property="og:url" content="${escapeHtml(siteUrl)}">
+<meta property="og:url" content="${escapeHtml(canonical)}">
 <meta property="og:locale" content="tr_TR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
-<link rel="canonical" href="${escapeHtml(siteUrl)}">
+<link rel="canonical" href="${escapeHtml(canonical)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css?v=${assetVersion}">
+${jsonLd}
 </head>
 <body>
 ${content}
 <script src="/app.js?v=${assetVersion}" defer></script>
 </body>
 </html>`;
+}
+
+function productLd(p) {
+  const market = marketById.get(p.market_id);
+  const obj = {
+    "@type": "Product",
+    name: p.name || "",
+    ...(p.image ? { image: p.image } : {}),
+    ...(p.category ? { category: p.category } : {}),
+    ...(market ? { brand: { "@type": "Brand", name: marketLabel(market) } } : {}),
+  };
+  if (p.price != null && p.price !== "") {
+    obj.offers = {
+      "@type": "Offer",
+      price: String(Number(p.price) || 0),
+      priceCurrency: "TRY",
+      availability: "https://schema.org/InStock",
+      ...(p.url ? { url: p.url } : {}),
+    };
+  }
+  return obj;
+}
+
+function itemListLd(products, pathname) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    url: `${siteUrl}${pathname}`,
+    numberOfItems: products.length,
+    itemListElement: products.slice(0, 60).map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: productLd(p),
+    })),
+  };
+}
+
+function breadcrumbLd(trail) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((t, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: t.name,
+      item: `${siteUrl}${t.path}`,
+    })),
+  };
+}
+
+function websiteLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    url: `${siteUrl}/`,
+    name: siteConfig.site.title,
+    description: siteConfig.site.description,
+    inLanguage: "tr-TR",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${siteUrl}/urunler/?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
 }
 
 function buildStyles() {
@@ -428,7 +572,8 @@ p{margin:0}
 .price-row strong{font-size:20px;font-weight:800;color:var(--text)}
 .price-row s{color:var(--muted);font-size:13px}
 .product-link{font-size:12px;color:var(--accent);font-weight:600;margin-top:6px}
-.filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;background:var(--surface);padding:20px;border-radius:var(--radius);box-shadow:var(--shadow);margin-top:24px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;background:var(--surface);padding:20px;border-radius:var(--radius);box-shadow:var(--shadow);margin-top:24px}
+.filters label:first-child{grid-column:1/-1}
 .filters label{display:grid;gap:6px}
 .filters span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .filters input,.filters select{width:100%;height:42px;border-radius:8px;border:1px solid var(--line);padding:0 12px;font:inherit;background:#fff;color:var(--text)}
@@ -453,10 +598,47 @@ p{margin:0}
 
 function buildClientJs() {
   return `(()=>{
-const s=document.getElementById('search');const m=document.getElementById('market-filter');const c=document.getElementById('category-filter');const g=document.getElementById('product-grid');const n=document.getElementById('count');const e=document.getElementById('empty');if(!g)return;
+const $=id=>document.getElementById(id);
+const s=$('search'),m=$('market-filter'),c=$('category-filter'),pmin=$('price-min'),pmax=$('price-max'),sort=$('sort'),g=$('product-grid'),n=$('count'),e=$('empty');
+if(!g)return;
 const norm=v=>String(v||'').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();
-const apply=()=>{const q=s?norm(s.value):'';const mm=m?m.value:'';const cc=c?c.value:'';let v=0;for(const card of g.children){const show=(!q||(card.dataset.search||'').includes(q))&&(!mm||card.dataset.market===mm)&&(!cc||card.dataset.category===cc);card.classList.toggle('hidden',!show);if(show)v++;}if(n)n.textContent=v;if(e)e.classList.toggle('hidden',v!==0);};
-[s,m,c].forEach(el=>el&&el.addEventListener('input',apply));[s,m,c].forEach(el=>el&&el.addEventListener('change',apply));
+const cards=Array.from(g.children);
+const params=new URLSearchParams(location.search);
+if(s&&params.get('q'))s.value=params.get('q');
+const apply=()=>{
+  const q=s?norm(s.value):'';
+  const mm=m?m.value:'';
+  const cc=c?c.value:'';
+  const lo=pmin&&pmin.value!==''?Number(pmin.value):null;
+  const hi=pmax&&pmax.value!==''?Number(pmax.value):null;
+  let v=0;
+  for(const card of cards){
+    const price=card.dataset.price===''?null:Number(card.dataset.price);
+    const show=(!q||(card.dataset.search||'').includes(q))
+      &&(!mm||card.dataset.market===mm)
+      &&(!cc||card.dataset.category===cc)
+      &&(lo===null||(price!==null&&price>=lo))
+      &&(hi===null||(price!==null&&price<=hi));
+    card.classList.toggle('hidden',!show);
+    if(show)v++;
+  }
+  if(n)n.textContent=v;
+  if(e)e.classList.toggle('hidden',v!==0);
+  if(sort){
+    const mode=sort.value;
+    const key=c=>{
+      if(mode==='price-asc'||mode==='price-desc'){const p=c.dataset.price;return p===''?(mode==='price-asc'?Infinity:-Infinity):Number(p);}
+      if(mode==='discount-desc')return Number(c.dataset.discount||0);
+      return Number(c.dataset.ts||0);
+    };
+    const dir=(mode==='price-asc')?1:-1;
+    const sorted=cards.slice().sort((a,b)=>(key(a)-key(b))*dir);
+    for(const el of sorted)g.appendChild(el);
+  }
+};
+[s,m,c,pmin,pmax,sort].forEach(el=>el&&el.addEventListener('input',apply));
+[s,m,c,pmin,pmax,sort].forEach(el=>el&&el.addEventListener('change',apply));
+apply();
 })();`;
 }
 
