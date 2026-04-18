@@ -1,0 +1,39 @@
+name: Social - Telegram
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (gondermeden logla)"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # 2 saatte bir — yeni indirimleri tarar
+    - cron: "0 */2 * * *"
+
+concurrency:
+  group: social-telegram
+  cancel-in-progress: false
+
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    env:
+      SITE_URL: ${{ secrets.SITE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SOCIAL_MIN_DISCOUNT: ${{ vars.SOCIAL_MIN_DISCOUNT || '25' }}
+      SOCIAL_MAX_PER_RUN: ${{ vars.SOCIAL_MAX_PER_RUN || '6' }}
+      SOCIAL_PER_MARKET: ${{ vars.SOCIAL_PER_MARKET || '2' }}
+      SOCIAL_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Telegram paylasim
+        run: node scripts/social/telegram.mjs

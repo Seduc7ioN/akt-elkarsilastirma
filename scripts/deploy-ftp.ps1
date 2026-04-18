@@ -66,23 +66,39 @@ function Send-FtpFile {
   param(
     [string]$LocalPath,
     [string]$RemoteUri,
-    [System.Net.NetworkCredential]$Credentials
+    [System.Net.NetworkCredential]$Credentials,
+    [int]$MaxAttempts = 4
   )
 
-  $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
-  $request.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-  $request.Credentials = $Credentials
-  $request.UseBinary = $true
-  $request.KeepAlive = $false
+  $attempt = 0
+  $lastError = $null
+  while ($attempt -lt $MaxAttempts) {
+    $attempt++
+    try {
+      $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+      $request.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+      $request.Credentials = $Credentials
+      $request.UseBinary = $true
+      $request.KeepAlive = $false
+      $request.Timeout = 60000
+      $request.ReadWriteTimeout = 60000
 
-  $bytes = [System.IO.File]::ReadAllBytes($LocalPath)
-  $request.ContentLength = $bytes.Length
-  $stream = $request.GetRequestStream()
-  $stream.Write($bytes, 0, $bytes.Length)
-  $stream.Close()
+      $bytes = [System.IO.File]::ReadAllBytes($LocalPath)
+      $request.ContentLength = $bytes.Length
+      $stream = $request.GetRequestStream()
+      $stream.Write($bytes, 0, $bytes.Length)
+      $stream.Close()
 
-  $response = $request.GetResponse()
-  $response.Close()
+      $response = $request.GetResponse()
+      $response.Close()
+      return
+    } catch {
+      $lastError = $_
+      Write-Host ("  ! Deneme {0}/{1} basarisiz: {2}" -f $attempt, $MaxAttempts, $_.Exception.Message)
+      Start-Sleep -Seconds ([math]::Min(10, 2 * $attempt))
+    }
+  }
+  throw $lastError
 }
 
 $allDirs = Get-ChildItem -Path $distDir -Directory -Recurse | Sort-Object FullName
@@ -95,12 +111,41 @@ foreach ($dir in $allDirs) {
 }
 
 $files = Get-ChildItem -Path $distDir -File -Recurse
+$failed = New-Object System.Collections.Generic.List[object]
 foreach ($file in $files) {
   $relative = $file.FullName.Substring($distDir.Length).TrimStart('\').Replace('\', '/')
   $remotePath = "{0}/{1}" -f $remoteRoot, $relative
   $remoteUri = "ftp://{0}{1}" -f $ftpHost, $remotePath
   Write-Host "Yukleniyor: $relative"
-  Send-FtpFile -LocalPath $file.FullName -RemoteUri $remoteUri -Credentials $credentials
+  try {
+    Send-FtpFile -LocalPath $file.FullName -RemoteUri $remoteUri -Credentials $credentials
+  } catch {
+    Write-Host ("  !! Basarisiz, ikinci tura birakildi: {0}" -f $relative)
+    $failed.Add([pscustomobject]@{ Local = $file.FullName; Uri = $remoteUri; Relative = $relative })
+  }
+}
+
+if ($failed.Count -gt 0) {
+  Write-Host ("Ikinci tur: {0} dosya tekrar deneniyor..." -f $failed.Count)
+  Start-Sleep -Seconds 5
+  $stillFailed = New-Object System.Collections.Generic.List[string]
+  foreach ($f in $failed) {
+    try {
+      # eksik dizin varsa yeniden olustur
+      $parent = ($f.Relative -replace '/[^/]*$', '')
+      if ($parent -and $parent -ne $f.Relative) {
+        New-FtpDirectory -Uri ("ftp://{0}{1}/{2}" -f $ftpHost, $remoteRoot, $parent) -Credentials $credentials
+      }
+      Send-FtpFile -LocalPath $f.Local -RemoteUri $f.Uri -Credentials $credentials
+      Write-Host ("  OK (2. tur): {0}" -f $f.Relative)
+    } catch {
+      Write-Host ("  HALA BASARISIZ: {0} -> {1}" -f $f.Relative, $_.Exception.Message)
+      $stillFailed.Add($f.Relative)
+    }
+  }
+  if ($stillFailed.Count -gt 0) {
+    throw ("Deploy tamamlanamadi, {0} dosya yuklenemedi." -f $stillFailed.Count)
+  }
 }
 
 Write-Host "FTP deploy tamamlandi."
