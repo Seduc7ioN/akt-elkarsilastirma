@@ -86,6 +86,20 @@ function renderHome() {
     .sort((a, b) => a.end - b.end)
     .slice(0, 8);
 
+  const latestBrochures = catalogs
+    .map((c) => ({ catalog: c, market: marketById.get(c.market_id) }))
+    .filter((x) => x.market)
+    .sort((a, b) => new Date(b.catalog.scraped_at || 0) - new Date(a.catalog.scraped_at || 0))
+    .slice(0, 10);
+
+  const categories = siteConfig.categories || [];
+  const marketCategory = siteConfig.marketCategory || {};
+  const byCategory = new Map(categories.map((c) => [c.id, []]));
+  for (const { market, catalog } of latestCatalogs) {
+    const cid = marketCategory[market.id];
+    if (cid && byCategory.has(cid)) byCategory.get(cid).push({ market, catalog });
+  }
+
   return layout(
     siteConfig.site.title,
     siteConfig.site.description,
@@ -117,11 +131,40 @@ function renderHome() {
       </section>
 
       <section class="section">
-        <div class="section-head"><h2>Bu haftanın katalogları</h2><small>${latestCatalogs.length} aktif</small></div>
+        <div class="section-head"><h2>Bu haftanın öne çıkan broşürleri</h2><small>${latestCatalogs.length} aktif</small></div>
         <div class="catalog-grid">
           ${latestCatalogs.map(({ market, catalog }) => renderCatalogCard(market, catalog)).join("")}
         </div>
       </section>
+
+      ${latestBrochures.length ? `
+      <section class="section">
+        <div class="section-head">
+          <div><p class="eyebrow">Son gelen broşürler</p><h2>En yeni kataloglar</h2></div>
+          <small>${latestBrochures.length} broşür</small>
+        </div>
+        <p class="muted" style="margin-bottom:16px">${escapeHtml(latestBrochures.map(x => marketLabel(x.market)).slice(0, 8).join(", "))} için en son eklenen broşürler.</p>
+        <div class="catalog-grid">
+          ${latestBrochures.map(({ market, catalog }) => renderCatalogCard(market, catalog)).join("")}
+        </div>
+      </section>` : ""}
+
+      ${categories.some((c) => (byCategory.get(c.id) || []).length) ? `
+      <section class="section">
+        <div class="section-head">
+          <div><p class="eyebrow">Kategori akışı</p><h2>Kategorilere göre indirimler</h2></div>
+        </div>
+        ${categories.map((cat) => {
+          const items = byCategory.get(cat.id) || [];
+          if (!items.length) return "";
+          return `<div class="category-block" style="--accent:${cat.accent}">
+            <div class="category-head"><h3>${escapeHtml(cat.label)}</h3><small>${items.length}</small></div>
+            <div class="catalog-grid">
+              ${items.slice(0, 8).map(({ market, catalog }) => renderCatalogCard(market, catalog)).join("")}
+            </div>
+          </div>`;
+        }).join("")}
+      </section>` : ""}
 
       ${endingSoon.length ? `
       <section class="section">
@@ -358,9 +401,37 @@ function renderHeader(active) {
 }
 
 function renderFooter() {
+  const footerCfg = siteConfig.footer || {};
+  const corporate = footerCfg.corporate || [];
+  const popularIds = footerCfg.popularMarkets || [];
+  const popularMarkets = popularIds.map((id) => marketById.get(id)).filter(Boolean);
+  const cats = siteConfig.categories || [];
   return `<footer class="footer">
-    <p>© ${new Date().getFullYear()} Aktüel Karşılaştırma · Veriler her marketin resmi sitesinden alınmaktadır.</p>
-    <p><small>Son güncelleme: ${new Date().toLocaleString("tr-TR")}</small></p>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <strong>${escapeHtml(siteConfig.site.title)}</strong>
+        <p>${escapeHtml(siteConfig.site.description)}</p>
+      </div>
+      ${corporate.length ? `<div class="footer-col">
+        <h4>Kurumsal &amp; Güven</h4>
+        <ul>${corporate.map((l) => `<li><a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a></li>`).join("")}</ul>
+      </div>` : ""}
+      ${popularMarkets.length ? `<div class="footer-col">
+        <h4>Popüler Marketler</h4>
+        <ul>
+          ${popularMarkets.map((m) => `<li><a href="/market/${m.id}/">${escapeHtml(marketLabel(m))}</a></li>`).join("")}
+          <li><a href="/#marketler" class="footer-more">Tüm Marketler →</a></li>
+        </ul>
+      </div>` : ""}
+      ${cats.length ? `<div class="footer-col">
+        <h4>Kategoriler</h4>
+        <ul>${cats.slice(0, 4).map((c) => `<li><a href="/#kategoriler">${escapeHtml(c.label)}</a></li>`).join("")}</ul>
+      </div>` : ""}
+    </div>
+    <div class="footer-bottom">
+      <p>© ${new Date().getFullYear()} ${escapeHtml(siteConfig.site.title)} · Veriler her marketin resmi sitesinden alınmaktadır.</p>
+      <p><small>Son güncelleme: ${new Date().toLocaleString("tr-TR")}</small></p>
+    </div>
   </footer>`;
 }
 
@@ -682,7 +753,22 @@ p{margin:0}
 .modal-similar .price-row strong{font-size:14px}
 body.modal-open{overflow:hidden}
 @media (max-width:600px){.modal-product{grid-template-columns:1fr}}
-.footer{margin-top:60px;padding:24px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+.category-block{margin-top:22px;padding:18px 20px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border-left:4px solid var(--accent)}
+.category-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+.category-head h3{font-size:18px;font-weight:700;color:var(--text)}
+.category-head small{color:var(--muted);background:#f1f5f9;padding:2px 10px;border-radius:999px;font-weight:600}
+.footer{margin-top:60px;padding-top:36px;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+.footer-grid{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:32px;padding:0 8px}
+.footer-brand strong{display:block;font-size:18px;color:var(--text);margin-bottom:10px}
+.footer-brand p{font-size:13px;line-height:1.5;max-width:36ch}
+.footer-col h4{font-size:11px;letter-spacing:.12em;font-weight:700;color:var(--text);text-transform:uppercase;margin-bottom:12px}
+.footer-col ul{list-style:none;padding:0;margin:0;display:grid;gap:7px}
+.footer-col a{color:var(--muted);font-size:13px}
+.footer-col a:hover{color:var(--accent)}
+.footer-col a.footer-more{color:var(--text);font-weight:600}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding:18px 8px;border-top:1px solid var(--line);flex-wrap:wrap;gap:8px}
+.footer-bottom small{font-size:11px}
+@media (max-width:760px){.footer-grid{grid-template-columns:1fr 1fr;gap:24px}.footer-brand{grid-column:1/-1}}
 .footer small{font-size:11px}
 @media (max-width:720px){
   .topbar{flex-direction:column;align-items:stretch}

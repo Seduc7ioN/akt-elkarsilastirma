@@ -5,23 +5,78 @@
     "tagline": "Marketlerin haftalık aktüel ürünleri tek ekranda",
     "description": "BİM, A101, ŞOK, Migros, Hakmar ve daha fazlasının haftalık aktüel ürün ve kampanyalarını karşılaştır."
   },
-  "marketOrder": ["bim", "a101", "sok", "migros", "hakmar", "file", "bizimtoptan"],
+  "marketOrder": ["bim", "a101", "sok", "migros", "carrefoursa", "metro", "file", "hakmar", "bizimtoptan", "tarimkredi"],
+  "categories": [
+    { "id": "supermarket", "label": "Süpermarket & Gıda", "accent": "#e11d48" },
+    { "id": "elektronik", "label": "Elektronik & Beyaz Eşya", "accent": "#2563eb" },
+    { "id": "oyuncak", "label": "Oyuncak & Kırtasiye", "accent": "#7c3aed" },
+    { "id": "ev", "label": "Ev & Yaşam", "accent": "#059669" },
+    { "id": "yapi", "label": "Yapı Market & Hırdavat", "accent": "#d97706" },
+    { "id": "kozmetik", "label": "Kozmetik & Kişisel Bakım", "accent": "#db2777" }
+  ],
+  "marketCategory": {
+    "a101": "supermarket",
+    "alipehlivanoglu": "supermarket",
+    "ankagross": "supermarket",
+    "anpagross": "supermarket",
+    "aybimas": "supermarket",
+    "bicenmarket": "supermarket",
+    "bim": "supermarket",
+    "bizimtoptan": "supermarket",
+    "cagrimarket": "supermarket",
+    "carrefoursa": "supermarket",
+    "celikkayalar": "supermarket",
+    "esenlik": "supermarket",
+    "file": "supermarket",
+    "getirbuyuk": "supermarket",
+    "gimsa": "supermarket",
+    "hakmar": "supermarket",
+    "happycenter": "supermarket",
+    "kimmarket": "supermarket",
+    "macrocenter": "supermarket",
+    "metro": "supermarket",
+    "migros": "supermarket",
+    "mopas": "supermarket",
+    "namli": "supermarket",
+    "onur": "supermarket",
+    "ozhan": "supermarket",
+    "pekdemir": "supermarket",
+    "showgross": "supermarket",
+    "sok": "supermarket",
+    "tarimkredi": "supermarket",
+    "yunusmarket": "supermarket"
+  },
   "marketLabels": {
     "bim": "BİM",
     "a101": "A101",
     "sok": "ŞOK",
     "migros": "Migros",
+    "carrefoursa": "CarrefourSA",
+    "metro": "Metro",
     "hakmar": "Hakmar",
     "file": "File",
-    "bizimtoptan": "Bizim Toptan"
+    "bizimtoptan": "Bizim Toptan",
+    "tarimkredi": "Tarım Kredi"
   },
   "marketColors": {
     "bim": "#E3000F",
     "a101": "#003399",
     "sok": "#F4A300",
     "migros": "#F57C00",
+    "carrefoursa": "#0057A6",
+    "metro": "#FFCC00",
     "hakmar": "#008751",
     "file": "#7B1FA2",
-    "bizimtoptan": "#1565C0"
+    "bizimtoptan": "#1565C0",
+    "tarimkredi": "#2E7D32"
+  },
+  "footer": {
+    "corporate": [
+      { "label": "Hakkımızda", "href": "/hakkimizda/" },
+      { "label": "İletişim", "href": "/iletisim/" },
+      { "label": "Gizlilik & KVKK", "href": "/gizlilik/" },
+      { "label": "Kullanım Koşulları", "href": "/kosullar/" }
+    ],
+    "popularMarkets": ["bim", "a101", "sok", "migros", "tarimkredi", "metro"]
   }
 }
