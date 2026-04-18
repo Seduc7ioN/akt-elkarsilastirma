@@ -69,10 +69,13 @@ function renderHome() {
   const latestCatalogs = orderedMarkets
     .map((m) => ({ market: m, catalog: latestCatalogByMarket.get(m.id) }))
     .filter((x) => x.catalog);
-  const topDiscounts = products
-    .filter((p) => p.discount_pct && p.discount_pct > 0)
-    .sort((a, b) => (b.discount_pct || 0) - (a.discount_pct || 0))
-    .slice(0, 12);
+  const topDiscounts = diversifyByMarket(
+    products
+      .filter((p) => p.discount_pct && p.discount_pct > 0)
+      .sort((a, b) => (b.discount_pct || 0) - (a.discount_pct || 0)),
+    2,
+    12
+  );
   const recentProducts = products.slice(0, 24);
 
   const now = Date.now();
@@ -91,17 +94,17 @@ function renderHome() {
 
       <section class="hero">
         <div>
-          <p class="eyebrow">Canli akis</p>
+          <p class="eyebrow">Canlı akış</p>
           <h1>${escapeHtml(siteConfig.site.tagline)}</h1>
           <p class="hero-sub">BİM, A101, ŞOK, Migros, Hakmar ve daha fazla market. Haftalık katalog ve aktüel ürünler tek akışta.</p>
+          <form class="hero-search" action="/urunler/" method="get" role="search">
+            <input type="search" name="q" placeholder="Ürün ara... (Örn: peynir, deterjan, şampuan)" aria-label="Ürün ara">
+            <button type="submit" class="btn primary">Ara</button>
+          </form>
           <div class="hero-stats">
             <div><strong>${markets.length}</strong><span>market</span></div>
             <div><strong>${catalogs.length}</strong><span>katalog</span></div>
             <div><strong>${products.length}</strong><span>ürün</span></div>
-          </div>
-          <div class="hero-actions">
-            <a class="btn primary" href="/urunler/">Tüm ürünleri ara</a>
-            <a class="btn" href="#marketler">Marketler</a>
           </div>
         </div>
       </section>
@@ -228,15 +231,15 @@ function renderCatalog(market, catalog) {
   const color = marketColor(market.id);
 
   return layout(
-    `${marketLabel(market)} ${catalog.period_text || dateRange(catalog)} kataloğu`,
-    `${marketLabel(market)} ${catalog.period_text || dateRange(catalog)} haftalık aktüel ürünleri.`,
+    `${marketLabel(market)} ${catalogTitle(catalog)} kataloğu`,
+    `${marketLabel(market)} ${catalogTitle(catalog)} haftalık aktüel ürünleri.`,
     `<main class="page">
       ${renderHeader("market")}
 
       <section class="hero market-hero" style="--accent:${color}">
         <div>
           <p class="eyebrow"><a href="/market/${market.id}/">${escapeHtml(marketLabel(market))}</a> · haftalık katalog</p>
-          <h1>${escapeHtml(catalog.period_text || dateRange(catalog))}</h1>
+          <h1>${escapeHtml(catalogTitle(catalog))}</h1>
           <p class="hero-sub">${catProducts.length} ürün · ${dateRange(catalog)}</p>
         </div>
       </section>
@@ -257,7 +260,7 @@ function renderCatalog(market, catalog) {
         breadcrumbLd([
           { name: "Anasayfa", path: "/" },
           { name: marketLabel(market), path: `/market/${market.id}/` },
-          { name: catalog.period_text || dateRange(catalog) || "Katalog", path: `/market/${market.id}/${catalog.id}/` },
+          { name: catalogTitle(catalog) || "Katalog", path: `/market/${market.id}/${catalog.id}/` },
         ]),
         itemListLd(catProducts, `/market/${market.id}/${catalog.id}/`),
       ],
@@ -365,7 +368,7 @@ function renderCatalogCard(market, catalog, opts = {}) {
       <strong>${escapeHtml(marketLabel(market))}</strong>
       ${badge}
     </div>
-    <h3>${escapeHtml(catalog.period_text || dateRange(catalog))}</h3>
+    <h3>${escapeHtml(catalogTitle(catalog))}</h3>
     <p>${dateRange(catalog)}</p>
     <small>${count} ürün</small>
   </a>`;
@@ -379,7 +382,21 @@ function renderProductCard(p) {
   const price = Number.isFinite(priceNum) ? priceNum : "";
   const discount = Number(p.discount_pct) || 0;
   const ts = p.scraped_at ? new Date(p.scraped_at).getTime() || 0 : 0;
-  return `<article class="product-card" data-search="${escapeHtml(search)}" data-market="${escapeHtml(p.market_id || "")}" data-category="${escapeHtml(p.category || "")}" data-price="${price}" data-discount="${discount}" data-ts="${ts}" style="--accent:${color}">
+  const payload = JSON.stringify({
+    id: p.id,
+    name: p.name || "",
+    image: p.image || "",
+    price: p.price ?? null,
+    oldPrice: p.old_price ?? null,
+    discount: p.discount_pct || 0,
+    category: p.category || "",
+    market: marketLabel(market),
+    marketId: p.market_id || "",
+    color,
+    url: p.url || "",
+    badge: p.badge || "",
+  });
+  return `<article class="product-card" tabindex="0" role="button" data-product="${escapeHtml(payload)}" data-search="${escapeHtml(search)}" data-market="${escapeHtml(p.market_id || "")}" data-category="${escapeHtml(p.category || "")}" data-price="${price}" data-discount="${discount}" data-ts="${ts}" style="--accent:${color}">
     ${p.image ? `<div class="product-img"><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name || "")}" loading="lazy"></div>` : `<div class="product-img placeholder"></div>`}
     <div class="product-body">
       <div class="product-tags">
@@ -393,7 +410,7 @@ function renderProductCard(p) {
         <strong>${formatPrice(p.price)}</strong>
         ${p.old_price && Number(p.old_price) > Number(p.price || 0) ? `<s>${formatPrice(p.old_price)}</s>` : ""}
       </div>
-      ${p.url ? `<a class="product-link" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">Ürüne git →</a>` : ""}
+      <span class="product-link">Detay →</span>
     </div>
   </article>`;
 }
@@ -434,6 +451,13 @@ ${jsonLd}
 </head>
 <body>
 ${content}
+<div class="modal hidden" id="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-dialog">
+    <button class="modal-close" type="button" data-close aria-label="Kapat">×</button>
+    <div class="modal-body" id="product-modal-body"></div>
+  </div>
+</div>
 <script src="/app.js?v=${assetVersion}" defer></script>
 </body>
 </html>`;
@@ -534,6 +558,10 @@ p{margin:0}
 .hero-stats strong{display:block;font-size:28px;font-weight:800}
 .hero-stats span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
 .hero-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.hero-search{display:flex;gap:8px;margin-top:20px;max-width:560px}
+.hero-search input{flex:1;height:48px;border-radius:999px;border:1px solid var(--line);padding:0 20px;font:inherit;background:#fff;color:var(--text);box-shadow:var(--shadow)}
+.hero-search input:focus{outline:2px solid var(--accent);outline-offset:2px}
+.hero-search button{border-radius:999px;padding:0 24px;height:48px}
 .btn{display:inline-flex;align-items:center;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px;background:#f1f5f9;border:1px solid var(--line)}
 .btn:hover{background:#e2e8f0}
 .btn.primary{background:var(--text);color:#fff;border-color:var(--text)}
@@ -557,8 +585,9 @@ p{margin:0}
 .catalog-card p{color:var(--muted);font-size:13px}
 .catalog-card small{display:block;margin-top:10px;color:var(--muted);font-size:12px;font-weight:600}
 .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-.product-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .15s}
+.product-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform .15s;cursor:pointer;border:0;text-align:left;font:inherit;color:inherit}
 .product-card:hover{transform:translateY(-3px)}
+.product-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .product-img{aspect-ratio:1/1;background:#f1f5f9;overflow:hidden}
 .product-img img{width:100%;height:100%;object-fit:contain;padding:10px}
 .product-img.placeholder{background:linear-gradient(135deg,#f1f5f9,#e2e8f0)}
@@ -585,6 +614,25 @@ p{margin:0}
 .comment-head strong{font-size:14px}
 .comment-head small{color:var(--muted);font-size:12px}
 .comment p{font-size:14px;line-height:1.55;color:var(--text)}
+.modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal.hidden{display:none}
+.modal-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(3px)}
+.modal-dialog{position:relative;background:var(--surface);border-radius:var(--radius);max-width:780px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(15,23,42,.25)}
+.modal-close{position:absolute;top:10px;right:14px;width:36px;height:36px;border-radius:50%;border:0;background:#f1f5f9;font-size:22px;cursor:pointer;z-index:2}
+.modal-close:hover{background:#e2e8f0}
+.modal-body{padding:28px}
+.modal-product{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.modal-product .product-img{aspect-ratio:1/1;background:#f1f5f9;border-radius:var(--radius);overflow:hidden}
+.modal-product .product-img img{width:100%;height:100%;object-fit:contain;padding:10px}
+.modal-product .price-row strong{font-size:28px}
+.modal-product h2{font-size:22px}
+.modal-similar h3{font-size:14px;margin:24px 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.modal-similar .product-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.modal-similar .product-card{box-shadow:none;border:1px solid var(--line)}
+.modal-similar .product-card h3{font-size:12px}
+.modal-similar .price-row strong{font-size:14px}
+body.modal-open{overflow:hidden}
+@media (max-width:600px){.modal-product{grid-template-columns:1fr}}
 .footer{margin-top:60px;padding:24px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 .footer small{font-size:11px}
 @media (max-width:720px){
@@ -598,6 +646,65 @@ p{margin:0}
 
 function buildClientJs() {
   return `(()=>{
+const fmtPrice=v=>{if(v==null||v==='')return '—';return new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(Number(v)||0);};
+const esc=v=>String(v==null?'':v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+const modal=document.getElementById('product-modal');
+const body=document.getElementById('product-modal-body');
+const openModal=(p)=>{
+  if(!modal||!body)return;
+  const similar=Array.from(document.querySelectorAll('.product-card'))
+    .filter(c=>c.dataset.category&&c.dataset.category===p.category&&c.dataset.product!==JSON.stringify(p))
+    .slice(0,6)
+    .map(c=>{try{return JSON.parse(c.dataset.product);}catch(e){return null;}})
+    .filter(Boolean);
+  body.innerHTML=
+    '<div class="modal-product" style="--accent:'+esc(p.color||'#e11d48')+'">'+
+      (p.image?'<div class="product-img"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'"></div>':'<div class="product-img placeholder"></div>')+
+      '<div>'+
+        '<div class="product-tags">'+
+          '<span class="tag market-tag">'+esc(p.market)+'</span>'+
+          (p.discount?'<span class="tag discount">%'+p.discount+' indirim</span>':'')+
+          (p.badge?'<span class="tag">'+esc(p.badge)+'</span>':'')+
+        '</div>'+
+        '<h2 id="product-modal-title">'+esc(p.name)+'</h2>'+
+        (p.category?'<p class="muted">'+esc(p.category)+'</p>':'')+
+        '<div class="price-row" style="margin:16px 0">'+
+          '<strong>'+fmtPrice(p.price)+'</strong>'+
+          (p.oldPrice&&Number(p.oldPrice)>Number(p.price||0)?'<s>'+fmtPrice(p.oldPrice)+'</s>':'')+
+        '</div>'+
+        (p.url?'<a class="btn primary" href="'+esc(p.url)+'" target="_blank" rel="noopener">Ürüne git →</a>':'')+
+        ' <a class="btn" href="/market/'+esc(p.marketId)+'/">'+esc(p.market)+' sayfası</a>'+
+      '</div>'+
+    '</div>'+
+    (similar.length?'<div class="modal-similar"><h3>Benzer ürünler</h3><div class="product-grid">'+
+      similar.map(s=>'<article class="product-card" data-product=\\''+esc(JSON.stringify(s))+'\\' style="--accent:'+esc(s.color||'#e11d48')+'">'+
+        (s.image?'<div class="product-img"><img src="'+esc(s.image)+'" alt="'+esc(s.name)+'" loading="lazy"></div>':'<div class="product-img placeholder"></div>')+
+        '<div class="product-body"><div class="product-tags"><span class="tag market-tag">'+esc(s.market)+'</span></div>'+
+        '<h3>'+esc(s.name)+'</h3>'+
+        '<div class="price-row"><strong>'+fmtPrice(s.price)+'</strong></div></div></article>').join('')+
+      '</div></div>':'');
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+};
+const closeModal=()=>{if(modal){modal.classList.add('hidden');document.body.classList.remove('modal-open');}};
+document.addEventListener('click',(ev)=>{
+  const card=ev.target.closest('.product-card');
+  if(card&&card.dataset.product&&!ev.target.closest('a')&&!ev.target.closest('button.modal-close')){
+    ev.preventDefault();
+    try{openModal(JSON.parse(card.dataset.product));}catch(e){}
+    return;
+  }
+  if(ev.target.closest('[data-close]'))closeModal();
+});
+document.addEventListener('keydown',(ev)=>{if(ev.key==='Escape')closeModal();});
+document.addEventListener('keydown',(ev)=>{
+  if(ev.key!=='Enter'&&ev.key!==' ')return;
+  const card=document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('product-card')?document.activeElement:null;
+  if(!card)return;
+  ev.preventDefault();
+  try{openModal(JSON.parse(card.dataset.product));}catch(e){}
+});
+
 const $=id=>document.getElementById(id);
 const s=$('search'),m=$('market-filter'),c=$('category-filter'),pmin=$('price-min'),pmax=$('price-max'),sort=$('sort'),g=$('product-grid'),n=$('count'),e=$('empty');
 if(!g)return;
@@ -687,6 +794,34 @@ function dateRange(c) {
   if (!c?.week_start || !c?.week_end) return "";
   const fmt = (d) => new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
   return `${fmt(c.week_start)} – ${fmt(c.week_end)}`;
+}
+
+function catalogTitle(c) {
+  const raw = (c?.period_text || "").trim();
+  const bad = /\?\?/.test(raw) || /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i.test(raw) || !raw;
+  return bad ? dateRange(c) : raw;
+}
+
+function diversifyByMarket(list, perMarket, total) {
+  const counts = new Map();
+  const out = [];
+  const rest = [];
+  for (const p of list) {
+    const mid = p.market_id || "";
+    const n = counts.get(mid) || 0;
+    if (n < perMarket) {
+      counts.set(mid, n + 1);
+      out.push(p);
+      if (out.length >= total) return out;
+    } else {
+      rest.push(p);
+    }
+  }
+  for (const p of rest) {
+    if (out.length >= total) break;
+    out.push(p);
+  }
+  return out;
 }
 
 function formatPrice(v) {
