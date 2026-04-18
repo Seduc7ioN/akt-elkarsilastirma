@@ -3,14 +3,22 @@ name: Social - Telegram
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "Mod"
+        required: true
+        default: "spot"
+        type: choice
+        options: [spot, digest]
       dry_run:
         description: "Dry run (gondermeden logla)"
         required: false
         default: false
         type: boolean
   schedule:
-    # 2 saatte bir — yeni indirimleri tarar
-    - cron: "0 */2 * * *"
+    # Spot — her 2 saatte bir (UTC)
+    - cron: "15 */2 * * *"
+    # Digest — TR 09:00 / 15:00 / 20:00  (UTC 06:00 / 12:00 / 17:00)
+    - cron: "0 6,12,17 * * *"
 
 concurrency:
   group: social-telegram
@@ -26,14 +34,34 @@ jobs:
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      SOCIAL_MIN_DISCOUNT: ${{ vars.SOCIAL_MIN_DISCOUNT || '25' }}
-      SOCIAL_MAX_PER_RUN: ${{ vars.SOCIAL_MAX_PER_RUN || '6' }}
-      SOCIAL_PER_MARKET: ${{ vars.SOCIAL_PER_MARKET || '2' }}
       SOCIAL_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Telegram paylasim
-        run: node scripts/social/telegram.mjs
+
+      - name: Mod secimi (cron)
+        id: pick
+        shell: bash
+        run: |
+          # workflow_dispatch -> kullanici secimi
+          # schedule -> cron ifadesinden mod belirlenir
+          MODE=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.mode }}"
+          elif [ "${{ github.event.schedule }}" = "0 6,12,17 * * *" ]; then
+            MODE="digest"
+          else
+            MODE="spot"
+          fi
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "Secilen mod: $MODE"
+
+      - name: Telegram Spot
+        if: steps.pick.outputs.mode == 'spot'
+        run: node scripts/social/telegram-spot.mjs
+
+      - name: Telegram Digest
+        if: steps.pick.outputs.mode == 'digest'
+        run: node scripts/social/telegram-digest.mjs

@@ -7,11 +7,17 @@
 create table if not exists social_posts (
   id bigint generated always as identity primary key,
   product_id text not null,
-  channel text not null check (channel in ('telegram','instagram')),
+  channel text not null,
   message_id text,
   posted_at timestamptz not null default now(),
   unique (product_id, channel)
 );
+
+-- Eger tabloyu onceki katı check constraint'le olusturduysan temizle:
+alter table social_posts
+  drop constraint if exists social_posts_channel_check;
+
+-- channel degerleri: 'telegram_spot', 'telegram_digest', 'instagram_reels'
 
 create index if not exists social_posts_posted_at_idx
   on social_posts (posted_at desc);

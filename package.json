@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.mjs",
     "deploy:ftp": "powershell -ExecutionPolicy Bypass -File scripts/deploy-ftp.ps1",
     "publish": "npm run build && npm run deploy:ftp",
-    "social:telegram": "node scripts/social/telegram.mjs"
+    "social:spot": "node scripts/social/telegram-spot.mjs",
+    "social:digest": "node scripts/social/telegram-digest.mjs"
   }
 }
