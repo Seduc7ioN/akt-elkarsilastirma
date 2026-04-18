@@ -16,19 +16,21 @@ const assetVersion = Date.now().toString();
 const db = supabaseClient({ url: supabaseUrl, key: supabaseAnonKey });
 
 console.log("Supabase'ten veri cekiliyor...");
-const [markets, catalogs, products] = await Promise.all([
+const [markets, catalogs, products, comments] = await Promise.all([
   db.query("markets", "select=*"),
   db.query("weekly_catalogs", "select=*&order=week_start.desc"),
-  db.query("products", "select=*&order=scraped_at.desc&limit=5000"),
+  db.queryAll("products", "select=*&order=scraped_at.desc"),
+  db.query("comments", "select=*&order=created_at.desc&limit=500"),
 ]);
 
-console.log(`${markets.length} market, ${catalogs.length} katalog, ${products.length} urun.`);
+console.log(`${markets.length} market, ${catalogs.length} katalog, ${products.length} urun, ${comments.length} yorum.`);
 
 const marketById = new Map(markets.map((m) => [m.id, m]));
 const catalogById = new Map(catalogs.map((c) => [c.id, c]));
 const catalogsByMarket = groupBy(catalogs, "market_id");
 const productsByCatalog = groupBy(products, "catalog_id");
 const productsByMarket = groupBy(products, "market_id");
+const commentsByMarket = groupBy(comments, "market_id");
 
 const latestCatalogByMarket = new Map();
 for (const [mid, list] of catalogsByMarket) latestCatalogByMarket.set(mid, list[0]);
@@ -132,7 +134,8 @@ function renderHome() {
 
 function renderMarket(market) {
   const cats = catalogsByMarket.get(market.id) || [];
-  const marketProducts = (productsByMarket.get(market.id) || []).slice(0, 200);
+  const marketProducts = productsByMarket.get(market.id) || [];
+  const marketComments = commentsByMarket.get(market.id) || [];
   const color = marketColor(market.id);
 
   return layout(
@@ -165,9 +168,26 @@ function renderMarket(market) {
         </div>
       </section>
 
+      ${marketComments.length ? `
+      <section class="section">
+        <div class="section-head"><h2>Yorumlar</h2><small>${marketComments.length} yorum</small></div>
+        <div class="comment-list">
+          ${marketComments.slice(0, 20).map(renderComment).join("")}
+        </div>
+      </section>` : ""}
+
       ${renderFooter()}
-    </main>`
+    </main>`,
+    { ogImage: market.website ? null : null, type: "market" }
   );
+}
+
+function renderComment(c) {
+  const date = c.created_at ? new Date(c.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }) : "";
+  return `<article class="comment">
+    <div class="comment-head"><strong>${escapeHtml(c.username || "Anonim")}</strong>${date ? `<small>${escapeHtml(date)}</small>` : ""}</div>
+    <p>${escapeHtml(c.text || "")}</p>
+  </article>`;
 }
 
 function renderCatalog(market, catalog) {
@@ -201,7 +221,7 @@ function renderCatalog(market, catalog) {
 }
 
 function renderAllProducts() {
-  const all = products.slice(0, 1000);
+  const all = products;
   const categories = [...new Set(all.map((p) => p.category).filter(Boolean))].sort();
 
   return layout(
@@ -305,7 +325,9 @@ function renderProductCard(p) {
   </article>`;
 }
 
-function layout(title, description, content) {
+function layout(title, description, content, options = {}) {
+  const type = options.type || "website";
+  const ogImage = options.ogImage || `${siteUrl}/og-default.png`;
   return `<!doctype html>
 <html lang="tr">
 <head>
@@ -313,6 +335,18 @@ function layout(title, description, content) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
+<meta name="theme-color" content="#e11d48">
+<meta property="og:type" content="${escapeHtml(type)}">
+<meta property="og:site_name" content="${escapeHtml(siteConfig.site.title)}">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:image" content="${escapeHtml(ogImage)}">
+<meta property="og:url" content="${escapeHtml(siteUrl)}">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${escapeHtml(description)}">
+<link rel="canonical" href="${escapeHtml(siteUrl)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -400,6 +434,12 @@ p{margin:0}
 .filters input,.filters select{width:100%;height:42px;border-radius:8px;border:1px solid var(--line);padding:0 12px;font:inherit;background:#fff;color:var(--text)}
 .empty{padding:20px;text-align:center;color:var(--muted);background:var(--surface);border-radius:var(--radius)}
 .hidden{display:none!important}
+.comment-list{display:grid;gap:12px}
+.comment{background:var(--surface);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.comment-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+.comment-head strong{font-size:14px}
+.comment-head small{color:var(--muted);font-size:12px}
+.comment p{font-size:14px;line-height:1.55;color:var(--text)}
 .footer{margin-top:60px;padding:24px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
 .footer small{font-size:11px}
 @media (max-width:720px){

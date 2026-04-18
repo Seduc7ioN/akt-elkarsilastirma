@@ -8,7 +8,12 @@
       "Bash(node --check scripts/lib/env.mjs)",
       "Bash(curl -s -o /dev/null -w \"env URL \\(%{http_code}\\)\\\\n\" \"https://kbxpilljewvgjdzdnlgv.supabase.co/rest/v1/weekly_catalogs?select=id&limit=1\" -H \"apikey: sb_publishable_xLOTpzn5oaAMofCtSDkZDg_OIAKJKbh\")",
       "Bash(curl -s \"https://kbxpilljewvgjdzdnlgv.supabase.co/rest/v1/weekly_catalogs?select=id,market_id&limit=3\" -H \"apikey: sb_publishable_xLOTpzn5oaAMofCtSDkZDg_OIAKJKbh\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "PowerShell(gh auth status 2>&1)",
+      "PowerShell(gh repo view --json nameWithOwner,url 2>&1)",
+      "Bash(curl -s \"https://nxljktrstlfcvfnezdoc.supabase.co/rest/v1/products?select=id\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54bGprdHJzdGxmY3ZmbmV6ZG9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODAwMDUsImV4cCI6MjA5MTU1NjAwNX0.cuFst6nJJ38AX30rWAvVfAVg41J2gsqV08iPH8zqH0U\" -H \"Prefer: count=exact\" -H \"Range: 0-0\" -I)"
     ]
   }
 }
