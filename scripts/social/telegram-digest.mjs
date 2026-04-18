@@ -21,11 +21,10 @@ import {
 ensureEnv();
 
 const COUNT = Number(process.env.SOCIAL_DIGEST_COUNT || 6);
-const MIN = Number(process.env.SOCIAL_DIGEST_MIN_DISCOUNT || 20);
-const PER_MARKET = Number(process.env.SOCIAL_DIGEST_PER_MARKET || 2);
+const PER_MARKET_SOFT = Number(process.env.SOCIAL_DIGEST_PER_MARKET || 2);
 const CHANNEL = "telegram_digest";
 
-console.log(`Digest mod — ${COUNT} urun, min %${MIN}, ${PER_MARKET}/market`);
+console.log(`Digest mod — ${COUNT} urun (yumusak cesitlilik cap: ${PER_MARKET_SOFT}/market)`);
 
 const d = db();
 const [catalogs, products, postedIds] = await Promise.all([
@@ -36,23 +35,42 @@ const [catalogs, products, postedIds] = await Promise.all([
 
 const catalogById = new Map(catalogs.map((c) => [c.id, c]));
 
-// Fark oluşturmak icin: digest'e giren urunu son 7 gun icinde tekrar koyma — postedIds yeterli.
-// Ayrica indirim % + isim varsa secilebilir.
+// Digest icin "iyi urun" siralamasi:
+//  1) indirim yuzdesi desc  (varsa)
+//  2) eski_fiyat - yeni_fiyat TL tasarrufu desc
+//  3) scraped_at desc (zaten sorted)
+function score(p) {
+  const d = Number(p.discount_pct) || 0;
+  const save = p.old_price && Number(p.old_price) > Number(p.price)
+    ? Number(p.old_price) - Number(p.price)
+    : 0;
+  return d * 1000 + save; // discount dominant, sonra TL farki
+}
+
 const candidates = products
   .filter((p) => !postedIds.has(String(p.id)))
-  .filter((p) => Number(p.discount_pct) >= MIN)
   .filter((p) => p.name && p.price != null && p.price !== "")
-  .sort((a, b) => Number(b.discount_pct || 0) - Number(a.discount_pct || 0));
+  .sort((a, b) => score(b) - score(a));
 
-// Market cesitliligi
+// 1. tur: market basina en fazla PER_MARKET_SOFT ile cesitlendir
 const selected = [];
 const perMarket = new Map();
 for (const p of candidates) {
+  if (selected.length >= COUNT) break;
   const m = p.market_id || "_";
-  if ((perMarket.get(m) || 0) >= PER_MARKET) continue;
+  if ((perMarket.get(m) || 0) >= PER_MARKET_SOFT) continue;
   selected.push(p);
   perMarket.set(m, (perMarket.get(m) || 0) + 1);
-  if (selected.length >= COUNT) break;
+}
+// 2. tur: hala doldurmadiysak cap'i gevset
+if (selected.length < COUNT) {
+  const picked = new Set(selected.map((p) => String(p.id)));
+  for (const p of candidates) {
+    if (selected.length >= COUNT) break;
+    if (picked.has(String(p.id))) continue;
+    selected.push(p);
+    picked.add(String(p.id));
+  }
 }
 
 console.log(`Aday: ${candidates.length}, secilen: ${selected.length}`);
@@ -73,10 +91,14 @@ function buildDigest(items) {
     const url = catalogUrlFor(p, catalogById);
     lines.push(`${i + 1}\\. *${md(marketName(p.market_id))}*`);
     lines.push(`[${md(p.name)}](${url})`);
+    const pct = Number(p.discount_pct) || 0;
     if (p.old_price && Number(p.old_price) > Number(p.price)) {
-      lines.push(`~${md(tr(p.old_price))}~ *${md(tr(p.price))}*  \\(%${md(p.discount_pct)}\\)`);
+      const tail = pct > 0 ? `  \\(%${md(pct)}\\)` : "";
+      lines.push(`~${md(tr(p.old_price))}~ *${md(tr(p.price))}*${tail}`);
+    } else if (pct > 0) {
+      lines.push(`*${md(tr(p.price))}*  \\(%${md(pct)}\\)`);
     } else {
-      lines.push(`*${md(tr(p.price))}*  \\(%${md(p.discount_pct)}\\)`);
+      lines.push(`*${md(tr(p.price))}*`);
     }
     lines.push("");
   });
