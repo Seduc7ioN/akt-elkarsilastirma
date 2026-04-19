@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  html,body{width:1080px;height:1920px;background:#0a0a14;color:#fff;overflow:hidden}
+  body{background:radial-gradient(circle at 50% 30%,#0a1428 0%,#0a0a14 70%)}
+  .wrap{padding:80px 60px;height:100%;display:flex;flex-direction:column;position:relative}
+  .handle{color:#9ca3af;font-size:28px}
+  .date{position:absolute;top:82px;right:60px;color:#9ca3af;font-size:26px}
+  .title{text-align:center;color:#60a5fa;font-size:38px;font-weight:900;letter-spacing:6px;margin:60px 0 20px}
+  .product{text-align:center;color:#fff;font-size:60px;font-weight:900;margin-bottom:60px;line-height:1.15}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:50px;position:relative}
+  .crown{position:absolute;top:-40px;left:33.3%;transform:translateX(35%);z-index:2;background:#fbbf24;color:#78350f;font-weight:900;font-size:22px;padding:10px 22px;border-radius:20px;white-space:nowrap;box-shadow:0 8px 20px rgba(251,191,36,.4)}
+  .card{background:#0e1220;border:3px solid #1f2937;border-radius:22px;padding:36px 18px;text-align:center;min-height:340px;display:flex;flex-direction:column;justify-content:center}
+  .card.winner{border-color:#fbbf24;box-shadow:0 0 30px rgba(251,191,36,.3)}
+  .card .m{font-size:44px;font-weight:900;margin-bottom:24px;letter-spacing:1px}
+  .card .p{font-size:76px;font-weight:900;color:#fff}
+  .card .u{font-size:32px;color:#9ca3af;margin-top:4px}
+  .result{background:linear-gradient(90deg,#0a2a1c 0%,#0a1428 100%);border:2px solid #10b981;border-radius:24px;padding:36px 32px}
+  .result .t{color:#10b981;font-size:30px;font-weight:800;letter-spacing:4px;margin-bottom:20px}
+  .result .l1{color:#10b981;font-size:40px;font-weight:900}
+  .result .l2{color:#d1d5db;font-size:28px;margin-top:10px}
+  .result .hi{color:#10b981;font-weight:900}
+  .footer{text-align:center;margin-top:auto;padding-top:28px}
+  .footer .note{color:#9ca3af;font-size:22px}
+  .footer .tags{color:#60a5fa;font-size:24px;margin-top:10px;font-weight:600}
+</style></head>
+<body>
+  <span class="date">{{dateRange}}</span>
+  <div class="wrap">
+    <div class="handle">{{handle}}</div>
+    <div class="title">🛒 3 MARKET ANALİZİ</div>
+    <div class="product">{{productName}}</div>
+    <div class="grid">
+      <div class="crown">👑 EN UCUZ</div>
+      {{#each markets}}
+      <div class="card {{winnerClass}}"><div class="m" style="color:{{color}}">{{name}}</div><div class="p" style="color:{{color}}">{{price}}</div><div class="u">₺</div></div>
+      {{/each}}
+    </div>
+    <div class="result">
+      <div class="t">🚀 SONUÇ</div>
+      <div class="l1">En ucuz: <span class="hi">{{winnerMarket}}</span></div>
+      <div class="l2">En pahalıya göre <span class="hi">{{saving}} ₺ tasarruf</span> imkanı</div>
+    </div>
+    <div class="footer">
+      <div class="note">#aktüelkarşılaştırma · bilgi amaçlıdır</div>
+      <div class="tags">{{hashtags}}</div>
+    </div>
+  </div>
+</body></html>

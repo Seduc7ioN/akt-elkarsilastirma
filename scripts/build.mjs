@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile, readdir, copyFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
 import { supabaseClient } from "./lib/supabase.mjs";
@@ -16,19 +16,150 @@ const assetVersion = Date.now().toString();
 const db = supabaseClient({ url: supabaseUrl, key: supabaseAnonKey });
 
 console.log("Supabase'ten veri cekiliyor...");
-const [markets, catalogs, products, comments] = await Promise.all([
+const [markets, catalogsRaw, productsRaw, comments] = await Promise.all([
   db.query("markets", "select=*"),
   db.query("weekly_catalogs", "select=*&order=week_start.desc"),
   db.queryAll("products", "select=*&order=scraped_at.desc"),
   db.query("comments", "select=*&order=created_at.desc&limit=500"),
 ]);
 
-console.log(`${markets.length} market, ${catalogs.length} katalog, ${products.length} urun, ${comments.length} yorum.`);
+// --- Mojibake duzeltici: iki kat bozuk Turkce metinleri onar.
+//     Katman 1: "AktÃ¼el" -> "Aktüel" (UTF-8 over Latin-1)
+//     Katman 2: "SÃ±vÃ±" -> "Sıvı" (0xC3 0x84 -> 0xC4 byte replace oncesi UTF-8 decode)
+const MOJIBAKE_RE = /[\u00C0-\u00FF]/;
+const TR_RE = /[üöçşğıİŞĞÇÖÜ]/;
+const TR_WORD_RE = /[a-zçğıİöşüA-ZÇĞİÖŞÜ]/;
+function toBytes(s) {
+  // Her karakter Latin-1 araliginda (<=0xFF) ise o byte'a cevir.
+  const bytes = [];
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.charCodeAt(i);
+    if (cp > 0xFF) return null;
+    bytes.push(cp);
+  }
+  return bytes;
+}
+function candidate(bytes) {
+  try { return Buffer.from(bytes).toString("utf8"); } catch { return null; }
+}
+function fixMojibake(s) {
+  if (!s || typeof s !== "string" || !MOJIBAKE_RE.test(s)) return s;
+  const bytes = toBytes(s);
+  if (!bytes) return s;
+  const attempts = [];
+  // Aday 1: dogrudan UTF-8 decode (katman 1 mojibake)
+  const a1 = candidate(bytes);
+  if (a1) attempts.push(a1);
+  // Aday 2: once 0xC3 0x83/84/85 -> 0xC3/C4/C5 byte kisalt, sonra UTF-8 decode (katman 2)
+  const shrunk = [];
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0xC3 && (bytes[i+1] === 0x83 || bytes[i+1] === 0x84 || bytes[i+1] === 0x85)) {
+      shrunk.push(bytes[i+1] - 0x83 + 0xC3);
+      i++;
+    } else {
+      shrunk.push(bytes[i]);
+    }
+  }
+  const a2 = candidate(shrunk);
+  if (a2 && a2 !== a1) attempts.push(a2);
+  // En iyisi: Turkce karakter iceren, mojibake kalmayan, harf sayisi yuksek olan.
+  let best = s, bestScore = -1;
+  const score = (t) => {
+    if (!t) return -1;
+    if (MOJIBAKE_RE.test(t)) return -1; // hala bozuk
+    if (/[\u0080-\u009F]/.test(t)) return -1; // kontrol karakterleri
+    if (/\uFFFD/.test(t)) return -1; // replacement chars
+    const tr = (t.match(new RegExp(TR_WORD_RE.source, "g")) || []).length;
+    return tr;
+  };
+  for (const cand of attempts) {
+    const sc = score(cand);
+    if (sc > bestScore) { bestScore = sc; best = cand; }
+  }
+  // Orijinal de bozuk degilse bir degisiklik yapma.
+  if (!MOJIBAKE_RE.test(s)) return s;
+  // Orijinalden skorca iyilestirme var mi?
+  if (bestScore > 0 && best !== s) return best;
+  return s;
+}
+function fixFields(obj, keys) {
+  if (!obj) return;
+  for (const k of keys) if (obj[k]) obj[k] = fixMojibake(obj[k]);
+}
+let mojibakeFixCount = 0;
+const countFix = (before, after) => { if (before !== after) mojibakeFixCount++; };
+for (const m of markets) {
+  const b = m.name; fixFields(m, ["name", "description"]); countFix(b, m.name);
+}
+for (const c of catalogsRaw) {
+  const b = c.period_text; fixFields(c, ["period_text", "title", "description"]); countFix(b, c.period_text);
+}
+for (const p of productsRaw) {
+  const bn = p.name, bc = p.category, bb = p.badge;
+  fixFields(p, ["name", "category", "badge", "description"]);
+  if (bn !== p.name || bc !== p.category || bb !== p.badge) mojibakeFixCount++;
+}
+if (mojibakeFixCount) console.log(`  ${mojibakeFixCount} kayit mojibake'den duzeltildi.`);
+
+// --- "Sayfa N" sahte urunleri: broşür sayfalarını ürün olarak yazmış scraper.
+//     Bunları ürün listelerinden çıkarıp catalog.pages[] olarak topla ki
+//     broşür modal gerçek sayfaları göstersin.
+const pageBuckets = new Map(); // catalog_id -> Map<pageIndex, imageUrl>
+const keptProducts = [];
+let fakePageCount = 0;
+const SAYFA_RE = /\bsayfa\s+(\d+)\b/i;
+for (const p of productsRaw) {
+  const m = (p.name || "").match(SAYFA_RE);
+  if (m && p.catalog_id && p.image) {
+    const idx = Math.max(0, parseInt(m[1], 10) - 1);
+    if (!pageBuckets.has(p.catalog_id)) pageBuckets.set(p.catalog_id, new Map());
+    const bucket = pageBuckets.get(p.catalog_id);
+    if (!bucket.has(idx)) bucket.set(idx, p.image);
+    fakePageCount++;
+    continue;
+  }
+  keptProducts.push(p);
+}
+// Kataloglara pages alani ekle (bellek icinde; DB schema'sini degistirmez).
+for (const c of catalogsRaw) {
+  const bucket = pageBuckets.get(c.id);
+  if (!bucket || !bucket.size) continue;
+  const max = Math.max(...bucket.keys());
+  const arr = new Array(max + 1).fill(null);
+  for (const [i, url] of bucket) arr[i] = url;
+  c.pages = arr.filter(Boolean);
+}
+if (fakePageCount) console.log(`  ${fakePageCount} "Sayfa N" sahte urun urunden cikarildi, broşür sayfalarina donusturuldu.`);
+const products = keptProducts;
+
+// 0 urunlu kataloglari her yerde gizle — sayfa uretmez, listede gorunmez.
+const productsByCatalog = groupBy(products, "catalog_id");
+const catalogs = catalogsRaw.filter((c) => (productsByCatalog.get(c.id) || []).length > 0);
+const emptyCatalogCount = catalogsRaw.length - catalogs.length;
+
+console.log(`${markets.length} market, ${catalogs.length} katalog${emptyCatalogCount ? ` (${emptyCatalogCount} bos katalog gizlendi)` : ""}, ${products.length} urun, ${comments.length} yorum.`);
 
 const marketById = new Map(markets.map((m) => [m.id, m]));
 const catalogById = new Map(catalogs.map((c) => [c.id, c]));
 const catalogsByMarket = groupBy(catalogs, "market_id");
-const productsByCatalog = groupBy(products, "catalog_id");
+
+// Scraper bazen urun gorseli olarak brosurun TAM sayfasini ayarliyor.
+// Bu durumda UI'da dev brosur thumbnail olarak cikiyor; gorseli notrlestir.
+const normalizeUrl = (u) => String(u || "").trim().replace(/[?#].*$/, "").toLowerCase();
+const pageUrlSet = new Set();
+for (const c of catalogsRaw) {
+  if (c.cover_image) pageUrlSet.add(normalizeUrl(c.cover_image));
+  if (Array.isArray(c.pages)) for (const p of c.pages) if (p) pageUrlSet.add(normalizeUrl(p));
+}
+let neutralizedImages = 0;
+for (const p of products) {
+  if (p.image && pageUrlSet.has(normalizeUrl(p.image))) {
+    p.image = null;
+    neutralizedImages++;
+  }
+}
+if (neutralizedImages) console.log(`  ${neutralizedImages} urun gorseli brosur sayfasi oldugu icin placeholder'a cevrildi.`);
+
 const productsByMarket = groupBy(products, "market_id");
 const commentsByMarket = groupBy(comments, "market_id");
 
@@ -119,7 +250,27 @@ for (const page of corporatePages()) {
   await writeFile(path.join(dir, "index.html"), renderCorporate(page), "utf8");
 }
 
+// static/ altindaki dosyalari dist/'e aynen kopyala (ornek: sosyal.php, sosyal-data/.htaccess)
+await copyStaticTree(path.join(root, "static"), distDir);
+
 console.log(`Build tamamlandi -> ${distDir}`);
+
+async function copyStaticTree(srcRoot, dstRoot) {
+  let entries;
+  try { entries = await readdir(srcRoot, { withFileTypes: true }); }
+  catch { return; }
+  for (const e of entries) {
+    const src = path.join(srcRoot, e.name);
+    const dst = path.join(dstRoot, e.name);
+    if (e.isDirectory()) {
+      await mkdir(dst, { recursive: true });
+      await copyStaticTree(src, dst);
+    } else if (e.isFile()) {
+      await mkdir(path.dirname(dst), { recursive: true });
+      await copyFile(src, dst);
+    }
+  }
+}
 
 function renderHome() {
   const latestCatalogs = orderedMarkets
@@ -334,8 +485,10 @@ function renderComment(c) {
 function renderCatalog(market, catalog) {
   const catProducts = productsByCatalog.get(catalog.id) || [];
   const color = marketColor(market.id);
-  const pages = Array.isArray(catalog.pages) ? catalog.pages : [];
-  const coverImage = catalog.cover_image || pages[0] || catProducts.find((p) => p.image)?.image || "";
+  const rawPages = Array.isArray(catalog.pages) ? catalog.pages.filter(Boolean) : [];
+  const coverImage = catalog.cover_image || rawPages[0] || catProducts.find((p) => p.image)?.image || "";
+  // Broşür modal icin sayfa kaynagi: pages varsa onu kullan, yoksa kapak + urun gorselleri fallback.
+  const pages = rawPages.length ? rawPages : (coverImage ? [coverImage] : []);
   const galleryProducts = catProducts.filter((p) => p.image);
   const otherCats = (catalogsByMarket.get(market.id) || []).filter((c) => c.id !== catalog.id).slice(0, 6);
   const st = catalogStatus(catalog);
@@ -357,16 +510,24 @@ function renderCatalog(market, catalog) {
             ${market.website ? `<a class="btn" href="${escapeHtml(market.website)}" target="_blank" rel="noopener">Resmi site</a>` : ""}
           </div>
         </div>
-        ${coverImage ? `<div class="catalog-cover"><img src="${escapeHtml(coverImage)}" alt="${escapeHtml(marketLabel(market))} broşür kapağı" loading="lazy"></div>` : ""}
+        ${coverImage ? `<button type="button" class="catalog-cover brochure-page" data-brochure-index="0" aria-label="Broşürü büyüt"><img src="${escapeHtml(coverImage)}" alt="${escapeHtml(marketLabel(market))} broşür kapağı" loading="lazy"><span class="brochure-page-hint">Tıkla · Broşürü aç</span></button>` : ""}
       </section>
 
-      ${pages.length ? `
+      ${rawPages.length > 1 ? `
       <section class="section">
-        <div class="section-head"><h2>Broşür sayfaları</h2><small>${pages.length} sayfa</small></div>
+        <div class="section-head"><h2>Broşür sayfaları</h2><small>${rawPages.length} sayfa · tıkla büyüt</small></div>
         <div class="brochure-pages">
-          ${pages.map((src, i) => `<a href="${escapeHtml(src)}" target="_blank" rel="noopener" class="brochure-page"><img src="${escapeHtml(src)}" alt="Sayfa ${i + 1}" loading="lazy"><span>${i + 1}</span></a>`).join("")}
+          ${rawPages.map((src, i) => `<button type="button" class="brochure-page" data-brochure-index="${i}" aria-label="Sayfa ${i + 1} — büyüt"><img src="${escapeHtml(src)}" alt="Sayfa ${i + 1}" loading="lazy"><span>${i + 1}</span><span class="brochure-page-hint">Tıkla</span></button>`).join("")}
         </div>
       </section>` : ""}
+
+      <script id="catalog-brochure-data" type="application/json">${escapeJsonForScript(JSON.stringify({
+        market: { id: market.id, label: marketLabel(market), color, url: marketUrl(market) },
+        catalogTitle: catalogTitle(catalog),
+        dateRange: dateRange(catalog),
+        pages,
+        products: catProducts.map(productPayloadMin),
+      }))}</script>
 
       ${galleryProducts.length ? `
       <section class="section" id="brochure">
@@ -715,6 +876,27 @@ ${content}
     <div class="modal-body" id="product-modal-body"></div>
   </div>
 </div>
+<div class="modal hidden" id="brochure-modal" role="dialog" aria-modal="true" aria-label="Broşür görüntüleyici">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-dialog modal-dialog-wide brochure-dialog">
+    <button class="modal-close" type="button" data-close aria-label="Kapat">×</button>
+    <div class="brochure-viewer">
+      <div class="brochure-viewer-stage">
+        <button type="button" class="brochure-nav prev" id="bv-prev" aria-label="Önceki sayfa">‹</button>
+        <img id="bv-img" src="" alt="Broşür sayfası">
+        <button type="button" class="brochure-nav next" id="bv-next" aria-label="Sonraki sayfa">›</button>
+        <div class="brochure-counter"><span id="bv-i">1</span> / <span id="bv-n">1</span></div>
+      </div>
+      <div class="brochure-viewer-panel">
+        <div class="brochure-panel-head">
+          <h3>Bu broşürün ürünleri</h3>
+          <small id="bv-count">0 ürün</small>
+        </div>
+        <div class="product-grid brochure-panel-grid" id="bv-products"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="/app.js?v=${assetVersion}" defer></script>
 </body>
 </html>`;
@@ -825,13 +1007,45 @@ p{margin:0}
 .btn.primary:hover{background:#1e293b}
 .market-hero{border-left:6px solid var(--accent)}
 .catalog-hero{display:grid;grid-template-columns:1.5fr 1fr;gap:24px;align-items:center}
-.catalog-cover{border-radius:var(--radius);overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;box-shadow:var(--shadow)}
-.catalog-cover img{width:100%;height:100%;object-fit:cover}
+.catalog-cover{position:relative;border:0;padding:0;border-radius:var(--radius);overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;box-shadow:var(--shadow);cursor:zoom-in;display:block;width:100%;transition:transform .15s,box-shadow .15s}
+.catalog-cover:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(15,23,42,.22)}
+.catalog-cover:focus-visible{outline:3px solid var(--accent,#e11d48);outline-offset:3px}
+.catalog-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.catalog-cover .brochure-page-hint{position:absolute;top:10px;right:10px;left:auto;background:var(--accent,#e11d48);color:#fff;font-size:12px;padding:5px 10px;border-radius:999px;font-weight:700;opacity:0;transition:opacity .15s;pointer-events:none}
+.catalog-cover:hover .brochure-page-hint,.catalog-cover:focus-visible .brochure-page-hint{opacity:1}
 @media (max-width:720px){.catalog-hero{grid-template-columns:1fr}.catalog-cover{aspect-ratio:4/3;max-height:320px}}
 .brochure-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-.brochure-page{position:relative;border-radius:10px;overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;display:block;box-shadow:var(--shadow)}
-.brochure-page img{width:100%;height:100%;object-fit:cover}
+.brochure-page{position:relative;border:0;padding:0;border-radius:10px;overflow:hidden;background:#f1f5f9;aspect-ratio:3/4;display:block;box-shadow:var(--shadow);cursor:zoom-in;transition:transform .15s,box-shadow .15s;width:100%}
+.brochure-page:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(15,23,42,.18)}
+.brochure-page:focus-visible{outline:3px solid var(--accent,#e11d48);outline-offset:2px}
+.brochure-page img{width:100%;height:100%;object-fit:cover;display:block}
 .brochure-page span{position:absolute;bottom:6px;right:8px;background:rgba(15,23,42,.7);color:#fff;font-size:11px;padding:2px 7px;border-radius:999px;font-weight:600}
+.brochure-page-hint{position:absolute;top:6px;left:6px;bottom:auto;right:auto;background:var(--accent,#e11d48);color:#fff;font-size:11px;padding:3px 8px;border-radius:999px;font-weight:700;opacity:0;transition:opacity .15s}
+.brochure-page:hover .brochure-page-hint,.brochure-page:focus-visible .brochure-page-hint{opacity:1}
+.modal-dialog-wide{max-width:min(1280px,96vw);width:min(1280px,96vw)}
+.brochure-dialog{padding:0;overflow:hidden}
+.brochure-viewer{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);min-height:min(82vh,900px);max-height:90vh}
+.brochure-viewer-stage{position:relative;background:#0b0b14;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px}
+.brochure-viewer-stage img{max-width:100%;max-height:86vh;object-fit:contain;display:block;background:#0b0b14}
+.brochure-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.9);color:#0f172a;font-size:28px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:2}
+.brochure-nav.prev{left:12px}
+.brochure-nav.next{right:12px}
+.brochure-nav:disabled{opacity:.35;cursor:not-allowed}
+.brochure-counter{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.75);color:#fff;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600}
+.brochure-viewer-panel{background:var(--surface,#fff);overflow:auto;padding:18px;border-left:1px solid #e5e7eb}
+.brochure-panel-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.brochure-panel-head h3{margin:0;font-size:16px}
+.brochure-panel-head small{color:var(--muted,#64748b);font-size:12px}
+.brochure-panel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.brochure-panel-grid .product-card{padding:0;border-radius:10px}
+.brochure-panel-grid .product-body{padding:10px}
+.brochure-panel-grid .product-body h3{font-size:13px;line-height:1.3}
+.brochure-panel-grid .product-tags{gap:4px}
+.brochure-panel-grid .product-tags .tag{font-size:10px;padding:2px 6px}
+.brochure-panel-grid .price-row strong{font-size:14px}
+.brochure-panel-grid .product-img{aspect-ratio:1/1}
+.brochure-panel-grid .product-link{font-size:11px}
+@media (max-width:900px){.brochure-viewer{grid-template-columns:1fr;max-height:none}.brochure-viewer-stage{min-height:60vh}.brochure-viewer-stage img{max-height:60vh}.brochure-viewer-panel{border-left:0;border-top:1px solid #e5e7eb;max-height:45vh}}
 .brochure-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .gallery-tile{position:relative;border:0;padding:0;background:#f1f5f9;border-radius:10px;overflow:hidden;aspect-ratio:1/1;cursor:pointer;transition:transform .15s;box-shadow:0 1px 4px rgba(15,23,42,.06)}
 .gallery-tile:hover{transform:scale(1.03);z-index:1;box-shadow:var(--shadow)}
@@ -1006,9 +1220,11 @@ const modal=document.getElementById('product-modal');
 const body=document.getElementById('product-modal-body');
 const openModal=(p)=>{
   if(!modal||!body)return;
-  const similar=Array.from(document.querySelectorAll('.product-card'))
+  // "Brosurler" veya bos kategoriler broşürden kirpilmamis toplu görsellerle dolu — benzer onerisi spam olur.
+  const hasUsefulCat=p.category&&!/^bro[sş][uü]rler$/i.test(String(p.category).trim());
+  const similar=hasUsefulCat?Array.from(document.querySelectorAll('.product-card'))
     .filter(c=>c.dataset.category&&c.dataset.category===p.category&&c.dataset.product!==JSON.stringify(p))
-    .slice(0,6)
+    .slice(0,6):[]
     .map(c=>{try{return JSON.parse(c.dataset.product);}catch(e){return null;}})
     .filter(Boolean);
   body.innerHTML=
@@ -1040,17 +1256,75 @@ const openModal=(p)=>{
   modal.classList.remove('hidden');
   document.body.classList.add('modal-open');
 };
-const closeModal=()=>{if(modal){modal.classList.add('hidden');document.body.classList.remove('modal-open');}};
+const closeModal=(el)=>{const m=el||document.querySelector('.modal:not(.hidden)');if(!m)return;m.classList.add('hidden');if(!document.querySelector('.modal:not(.hidden)'))document.body.classList.remove('modal-open');};
+const closeAllModals=()=>{document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden'));document.body.classList.remove('modal-open');};
+
+// Brosur viewer state
+const bModal=document.getElementById('brochure-modal');
+const bImg=document.getElementById('bv-img');
+const bIdx=document.getElementById('bv-i');
+const bTot=document.getElementById('bv-n');
+const bCnt=document.getElementById('bv-count');
+const bPrev=document.getElementById('bv-prev');
+const bNext=document.getElementById('bv-next');
+const bGrid=document.getElementById('bv-products');
+let bData=null,bCur=0;
+const bDataEl=document.getElementById('catalog-brochure-data');
+if(bDataEl){try{bData=JSON.parse(bDataEl.textContent||'null');}catch(e){bData=null;}}
+const renderBrochurePanel=()=>{
+  if(!bGrid||!bData)return;
+  const prods=bData.products||[];
+  if(bCnt)bCnt.textContent=prods.length+' ürün';
+  bGrid.innerHTML=prods.map(p=>{
+    const img=p.image?'<div class="product-img"><img src="'+esc(p.image)+'" alt="'+esc(p.name)+'" loading="lazy"></div>':'<div class="product-img placeholder"></div>';
+    const tags='<div class="product-tags"><span class="tag market-tag">'+esc(p.market)+'</span>'+(p.discount?'<span class="tag discount">%'+p.discount+'</span>':'')+'</div>';
+    const price='<div class="price-row"><strong>'+fmtPrice(p.price)+'</strong>'+(p.oldPrice&&Number(p.oldPrice)>Number(p.price||0)?'<s>'+fmtPrice(p.oldPrice)+'</s>':'')+'</div>';
+    return '<article class="product-card" tabindex="0" role="button" data-product=\\''+esc(JSON.stringify(p))+'\\' style="--accent:'+esc(p.color||'#e11d48')+'">'+img+'<div class="product-body">'+tags+'<h3>'+esc(p.name)+'</h3>'+price+'<span class="product-link">Detay →</span></div></article>';
+  }).join('');
+};
+const showBrochurePage=(i)=>{
+  if(!bData||!bData.pages||!bData.pages.length)return;
+  bCur=Math.max(0,Math.min(i,bData.pages.length-1));
+  if(bImg)bImg.src=bData.pages[bCur];
+  if(bIdx)bIdx.textContent=String(bCur+1);
+  if(bTot)bTot.textContent=String(bData.pages.length);
+  if(bPrev)bPrev.disabled=bCur===0;
+  if(bNext)bNext.disabled=bCur===bData.pages.length-1;
+};
+const openBrochure=(i)=>{
+  if(!bModal||!bData)return;
+  renderBrochurePanel();
+  showBrochurePage(i||0);
+  bModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+};
+if(bPrev)bPrev.addEventListener('click',()=>showBrochurePage(bCur-1));
+if(bNext)bNext.addEventListener('click',()=>showBrochurePage(bCur+1));
+
 document.addEventListener('click',(ev)=>{
+  const bpage=ev.target.closest('.brochure-page');
+  if(bpage){
+    ev.preventDefault();
+    const i=parseInt(bpage.dataset.brochureIndex||'0',10)||0;
+    openBrochure(i);
+    return;
+  }
   const card=ev.target.closest('.product-card, .product-row');
-  if(card&&card.dataset.product&&!ev.target.closest('a')&&!ev.target.closest('button.modal-close')){
+  if(card&&card.dataset.product&&!ev.target.closest('a')&&!ev.target.closest('button.modal-close')&&!ev.target.closest('.brochure-nav')){
     ev.preventDefault();
     try{openModal(JSON.parse(card.dataset.product));}catch(e){}
     return;
   }
-  if(ev.target.closest('[data-close]'))closeModal();
+  const closeBtn=ev.target.closest('[data-close]');
+  if(closeBtn){const m=closeBtn.closest('.modal');closeModal(m);}
 });
-document.addEventListener('keydown',(ev)=>{if(ev.key==='Escape')closeModal();});
+document.addEventListener('keydown',(ev)=>{
+  if(ev.key==='Escape'){closeModal();return;}
+  if(bModal&&!bModal.classList.contains('hidden')){
+    if(ev.key==='ArrowLeft')showBrochurePage(bCur-1);
+    else if(ev.key==='ArrowRight')showBrochurePage(bCur+1);
+  }
+});
 document.addEventListener('keydown',(ev)=>{
   if(ev.key!=='Enter'&&ev.key!==' ')return;
   const ae=document.activeElement;const card=ae&&ae.classList&&(ae.classList.contains('product-card')||ae.classList.contains('product-row'))?ae:null;
@@ -1132,6 +1406,34 @@ function groupBy(rows, key) {
     map.get(k).push(row);
   }
   return map;
+}
+
+// Inline <script type="application/json"> icin guvenli escape: </script> kacir.
+function escapeJsonForScript(s) {
+  return String(s)
+    .replace(/<\/(script)/gi, "<\\/$1")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+// Brosur modal icin minimal urun payload'u (openModal ile ayni sekli kullaniyor).
+function productPayloadMin(p) {
+  const market = marketById.get(p.market_id);
+  const color = marketColor(p.market_id);
+  return {
+    id: p.id,
+    name: p.name || "",
+    image: p.image || "",
+    price: p.price ?? null,
+    oldPrice: p.old_price ?? null,
+    discount: p.discount_pct || 0,
+    category: p.category || "",
+    market: marketLabel(market),
+    marketId: p.market_id || "",
+    color,
+    url: p.url || "",
+    badge: p.badge || "",
+  };
 }
 
 function orderMarkets(list, preferred) {

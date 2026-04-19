@@ -9,6 +9,10 @@
     "deploy:ftp": "powershell -ExecutionPolicy Bypass -File scripts/deploy-ftp.ps1",
     "publish": "npm run build && npm run deploy:ftp",
     "social:spot": "node scripts/social/telegram-spot.mjs",
-    "social:digest": "node scripts/social/telegram-digest.mjs"
+    "social:digest": "node scripts/social/telegram-digest.mjs",
+    "social:reels": "node scripts/social/reels/index.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^23.0.0"
   }
 }
