@@ -16,12 +16,121 @@ const assetVersion = Date.now().toString();
 const db = supabaseClient({ url: supabaseUrl, key: supabaseAnonKey });
 
 console.log("Supabase'ten veri cekiliyor...");
-const [markets, catalogsRaw, products, comments] = await Promise.all([
+const [markets, catalogsRaw, productsRaw, comments] = await Promise.all([
   db.query("markets", "select=*"),
   db.query("weekly_catalogs", "select=*&order=week_start.desc"),
   db.queryAll("products", "select=*&order=scraped_at.desc"),
   db.query("comments", "select=*&order=created_at.desc&limit=500"),
 ]);
+
+// --- Mojibake duzeltici: iki kat bozuk Turkce metinleri onar.
+//     Katman 1: "AktÃ¼el" -> "Aktüel" (UTF-8 over Latin-1)
+//     Katman 2: "SÃ±vÃ±" -> "Sıvı" (0xC3 0x84 -> 0xC4 byte replace oncesi UTF-8 decode)
+const MOJIBAKE_RE = /[\u00C0-\u00FF]/;
+const TR_RE = /[üöçşğıİŞĞÇÖÜ]/;
+const TR_WORD_RE = /[a-zçğıİöşüA-ZÇĞİÖŞÜ]/;
+function toBytes(s) {
+  // Her karakter Latin-1 araliginda (<=0xFF) ise o byte'a cevir.
+  const bytes = [];
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.charCodeAt(i);
+    if (cp > 0xFF) return null;
+    bytes.push(cp);
+  }
+  return bytes;
+}
+function candidate(bytes) {
+  try { return Buffer.from(bytes).toString("utf8"); } catch { return null; }
+}
+function fixMojibake(s) {
+  if (!s || typeof s !== "string" || !MOJIBAKE_RE.test(s)) return s;
+  const bytes = toBytes(s);
+  if (!bytes) return s;
+  const attempts = [];
+  // Aday 1: dogrudan UTF-8 decode (katman 1 mojibake)
+  const a1 = candidate(bytes);
+  if (a1) attempts.push(a1);
+  // Aday 2: once 0xC3 0x83/84/85 -> 0xC3/C4/C5 byte kisalt, sonra UTF-8 decode (katman 2)
+  const shrunk = [];
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0xC3 && (bytes[i+1] === 0x83 || bytes[i+1] === 0x84 || bytes[i+1] === 0x85)) {
+      shrunk.push(bytes[i+1] - 0x83 + 0xC3);
+      i++;
+    } else {
+      shrunk.push(bytes[i]);
+    }
+  }
+  const a2 = candidate(shrunk);
+  if (a2 && a2 !== a1) attempts.push(a2);
+  // En iyisi: Turkce karakter iceren, mojibake kalmayan, harf sayisi yuksek olan.
+  let best = s, bestScore = -1;
+  const score = (t) => {
+    if (!t) return -1;
+    if (MOJIBAKE_RE.test(t)) return -1; // hala bozuk
+    if (/[\u0080-\u009F]/.test(t)) return -1; // kontrol karakterleri
+    if (/\uFFFD/.test(t)) return -1; // replacement chars
+    const tr = (t.match(new RegExp(TR_WORD_RE.source, "g")) || []).length;
+    return tr;
+  };
+  for (const cand of attempts) {
+    const sc = score(cand);
+    if (sc > bestScore) { bestScore = sc; best = cand; }
+  }
+  // Orijinal de bozuk degilse bir degisiklik yapma.
+  if (!MOJIBAKE_RE.test(s)) return s;
+  // Orijinalden skorca iyilestirme var mi?
+  if (bestScore > 0 && best !== s) return best;
+  return s;
+}
+function fixFields(obj, keys) {
+  if (!obj) return;
+  for (const k of keys) if (obj[k]) obj[k] = fixMojibake(obj[k]);
+}
+let mojibakeFixCount = 0;
+const countFix = (before, after) => { if (before !== after) mojibakeFixCount++; };
+for (const m of markets) {
+  const b = m.name; fixFields(m, ["name", "description"]); countFix(b, m.name);
+}
+for (const c of catalogsRaw) {
+  const b = c.period_text; fixFields(c, ["period_text", "title", "description"]); countFix(b, c.period_text);
+}
+for (const p of productsRaw) {
+  const bn = p.name, bc = p.category, bb = p.badge;
+  fixFields(p, ["name", "category", "badge", "description"]);
+  if (bn !== p.name || bc !== p.category || bb !== p.badge) mojibakeFixCount++;
+}
+if (mojibakeFixCount) console.log(`  ${mojibakeFixCount} kayit mojibake'den duzeltildi.`);
+
+// --- "Sayfa N" sahte urunleri: broşür sayfalarını ürün olarak yazmış scraper.
+//     Bunları ürün listelerinden çıkarıp catalog.pages[] olarak topla ki
+//     broşür modal gerçek sayfaları göstersin.
+const pageBuckets = new Map(); // catalog_id -> Map<pageIndex, imageUrl>
+const keptProducts = [];
+let fakePageCount = 0;
+const SAYFA_RE = /\bsayfa\s+(\d+)\b/i;
+for (const p of productsRaw) {
+  const m = (p.name || "").match(SAYFA_RE);
+  if (m && p.catalog_id && p.image) {
+    const idx = Math.max(0, parseInt(m[1], 10) - 1);
+    if (!pageBuckets.has(p.catalog_id)) pageBuckets.set(p.catalog_id, new Map());
+    const bucket = pageBuckets.get(p.catalog_id);
+    if (!bucket.has(idx)) bucket.set(idx, p.image);
+    fakePageCount++;
+    continue;
+  }
+  keptProducts.push(p);
+}
+// Kataloglara pages alani ekle (bellek icinde; DB schema'sini degistirmez).
+for (const c of catalogsRaw) {
+  const bucket = pageBuckets.get(c.id);
+  if (!bucket || !bucket.size) continue;
+  const max = Math.max(...bucket.keys());
+  const arr = new Array(max + 1).fill(null);
+  for (const [i, url] of bucket) arr[i] = url;
+  c.pages = arr.filter(Boolean);
+}
+if (fakePageCount) console.log(`  ${fakePageCount} "Sayfa N" sahte urun urunden cikarildi, broşür sayfalarina donusturuldu.`);
+const products = keptProducts;
 
 // 0 urunlu kataloglari her yerde gizle — sayfa uretmez, listede gorunmez.
 const productsByCatalog = groupBy(products, "catalog_id");
