@@ -105,8 +105,15 @@ async function main() {
     if (!byImage.has(img)) byImage.set(img, []);
     byImage.get(img).push(p);
   }
+  // Gercek brosur sayfasi = en az 2 FARKLI urun ismi paylasir. Ayni urunun
+  // duplicate kayitlarini (BIM'deki "BUZDOLABI KEY 330 STE" x6 gibi) atla.
   const groups = [...byImage.entries()]
-    .filter(([, ps]) => onlyImage || ps.length >= MIN_PRODUCTS)
+    .filter(([, ps]) => {
+      if (onlyImage) return true;
+      if (ps.length < MIN_PRODUCTS) return false;
+      const uniqNames = new Set(ps.map((p) => String(p.name).toLowerCase().trim())).size;
+      return uniqNames >= 2;
+    })
     .sort((a, b) => b[1].length - a[1].length);
   console.log(`  ${groups.length} brosur-sayfa kandidati.`);
   const work = limit ? groups.slice(0, limit) : groups;
@@ -128,9 +135,18 @@ async function main() {
     }
     bufCache.set(imgUrl, { buf: srcBuf, mediaType });
 
-    // 30 urun / chunk
+    // Ayni ismi paylasanlari (duplicate kayitlar) Vision'a tek sefer ver;
+    // tespit sonucunu tum es-isimli kayitlara yay.
+    const uniqByName = new Map(); // name -> temsilci product
+    for (const p of ps) {
+      const k = String(p.name).toLowerCase().trim();
+      if (!uniqByName.has(k)) uniqByName.set(k, p);
+    }
+    const reps = [...uniqByName.values()];
+    console.log(`  ${reps.length} distinct urun ismi (${ps.length} toplam kayit)`);
+
     const chunks = [];
-    for (let k = 0; k < ps.length; k += 30) chunks.push(ps.slice(k, k + 30));
+    for (let k = 0; k < reps.length; k += 30) chunks.push(reps.slice(k, k + 30));
     for (const chunk of chunks) {
       try {
         const r = await detectBboxes(srcBuf, mediaType, chunk.map((p) => ({ id: p.id, name: p.name })));
@@ -138,8 +154,14 @@ async function main() {
         visionOut += r.usage?.output_tokens || 0;
         console.log(`  Vision: ${r.detections.length}/${chunk.length} tespit`);
         for (const det of r.detections) {
-          const prod = chunk.find((p) => p.id === det.productId);
-          if (prod) detections.push({ prod, imgUrl, x: det.x, y: det.y, w: det.w, h: det.h });
+          const rep = chunk.find((p) => p.id === det.productId);
+          if (!rep) continue;
+          const nameKey = String(rep.name).toLowerCase().trim();
+          // es-isimli tum urunleri bul
+          const sames = ps.filter((p) => String(p.name).toLowerCase().trim() === nameKey);
+          for (const prod of sames) {
+            detections.push({ prod, imgUrl, x: det.x, y: det.y, w: det.w, h: det.h });
+          }
         }
       } catch (e) {
         console.log(`  Vision hata: ${e.message}`);
