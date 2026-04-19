@@ -883,9 +883,13 @@ ${content}
     <div class="brochure-viewer">
       <div class="brochure-viewer-stage">
         <button type="button" class="brochure-nav prev" id="bv-prev" aria-label="Önceki sayfa">‹</button>
-        <img id="bv-img" src="" alt="Broşür sayfası">
+        <div class="brochure-frame" id="bv-frame">
+          <img id="bv-img" src="" alt="Broşür sayfası">
+          <div class="brochure-hotspots" id="bv-hotspots" aria-hidden="false"></div>
+        </div>
         <button type="button" class="brochure-nav next" id="bv-next" aria-label="Sonraki sayfa">›</button>
         <div class="brochure-counter"><span id="bv-i">1</span> / <span id="bv-n">1</span></div>
+        <button type="button" class="brochure-hotspot-toggle" id="bv-hs-toggle" aria-pressed="true" title="Tıklanabilir ürünleri göster/gizle">Ürün kutuları: Açık</button>
       </div>
       <div class="brochure-viewer-panel">
         <div class="brochure-panel-head">
@@ -1026,7 +1030,17 @@ p{margin:0}
 .brochure-dialog{padding:0;overflow:hidden}
 .brochure-viewer{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);min-height:min(82vh,900px);max-height:90vh}
 .brochure-viewer-stage{position:relative;background:#0b0b14;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px}
-.brochure-viewer-stage img{max-width:100%;max-height:86vh;object-fit:contain;display:block;background:#0b0b14}
+.brochure-frame{position:relative;display:inline-block;max-width:100%;max-height:86vh;line-height:0}
+.brochure-frame img{max-width:100%;max-height:86vh;object-fit:contain;display:block;background:#0b0b14}
+.brochure-hotspots{position:absolute;inset:0;pointer-events:none}
+.brochure-hotspot{position:absolute;border:2px solid rgba(225,29,72,.0);background:rgba(225,29,72,.0);border-radius:8px;cursor:pointer;pointer-events:auto;transition:background .15s,border-color .15s,box-shadow .15s;padding:0}
+.brochure-hotspot:hover,.brochure-hotspot:focus-visible{background:rgba(225,29,72,.18);border-color:rgba(225,29,72,.9);box-shadow:0 0 0 2px rgba(255,255,255,.25),0 8px 24px rgba(0,0,0,.35);outline:none}
+.brochure-hotspot-label{position:absolute;left:0;right:0;bottom:100%;margin-bottom:6px;background:#0b0b14;color:#fff;font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.brochure-hotspot:hover .brochure-hotspot-label,.brochure-hotspot:focus-visible .brochure-hotspot-label{opacity:1;transform:translateY(0)}
+.brochure-hotspots.peek .brochure-hotspot{background:rgba(225,29,72,.08);border-color:rgba(225,29,72,.55)}
+.brochure-hotspot-toggle{position:absolute;bottom:12px;left:12px;background:rgba(15,23,42,.8);color:#fff;border:0;padding:6px 12px;border-radius:999px;font-size:12px;cursor:pointer;font-weight:600;z-index:3}
+.brochure-hotspot-toggle:hover{background:rgba(15,23,42,.95)}
+.brochure-hotspots.hidden-hs{display:none}
 .brochure-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.9);color:#0f172a;font-size:28px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:2}
 .brochure-nav.prev{left:12px}
 .brochure-nav.next{right:12px}
@@ -1045,7 +1059,7 @@ p{margin:0}
 .brochure-panel-grid .price-row strong{font-size:14px}
 .brochure-panel-grid .product-img{aspect-ratio:1/1}
 .brochure-panel-grid .product-link{font-size:11px}
-@media (max-width:900px){.brochure-viewer{grid-template-columns:1fr;max-height:none}.brochure-viewer-stage{min-height:60vh}.brochure-viewer-stage img{max-height:60vh}.brochure-viewer-panel{border-left:0;border-top:1px solid #e5e7eb;max-height:45vh}}
+@media (max-width:900px){.brochure-viewer{grid-template-columns:1fr;max-height:none}.brochure-viewer-stage{min-height:60vh}.brochure-frame{max-height:60vh}.brochure-frame img{max-height:60vh}.brochure-viewer-panel{border-left:0;border-top:1px solid #e5e7eb;max-height:45vh}}
 .brochure-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .gallery-tile{position:relative;border:0;padding:0;background:#f1f5f9;border-radius:10px;overflow:hidden;aspect-ratio:1/1;cursor:pointer;transition:transform .15s;box-shadow:0 1px 4px rgba(15,23,42,.06)}
 .gallery-tile:hover{transform:scale(1.03);z-index:1;box-shadow:var(--shadow)}
@@ -1282,6 +1296,33 @@ const renderBrochurePanel=()=>{
     return '<article class="product-card" tabindex="0" role="button" data-product=\\''+esc(JSON.stringify(p))+'\\' style="--accent:'+esc(p.color||'#e11d48')+'">'+img+'<div class="product-body">'+tags+'<h3>'+esc(p.name)+'</h3>'+price+'<span class="product-link">Detay →</span></div></article>';
   }).join('');
 };
+const bHotspots=document.getElementById('bv-hotspots');
+const bHsToggle=document.getElementById('bv-hs-toggle');
+let bHsPeek=true;
+const renderHotspots=()=>{
+  if(!bHotspots||!bData)return;
+  bHotspots.innerHTML='';
+  const prods=(bData.products||[]).filter(p=>p&&p.bbox&&p.bbox.page===bCur);
+  if(!prods.length){if(bHsToggle)bHsToggle.style.display='none';return;}
+  if(bHsToggle)bHsToggle.style.display='';
+  for(const p of prods){
+    const bb=p.bbox;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='brochure-hotspot';
+    btn.style.left=(bb.x*100).toFixed(3)+'%';
+    btn.style.top=(bb.y*100).toFixed(3)+'%';
+    btn.style.width=(bb.w*100).toFixed(3)+'%';
+    btn.style.height=(bb.h*100).toFixed(3)+'%';
+    btn.setAttribute('aria-label',p.name||'Ürün');
+    btn.dataset.product=JSON.stringify(p);
+    const lbl=document.createElement('span');
+    lbl.className='brochure-hotspot-label';
+    lbl.textContent=p.name||'';
+    btn.appendChild(lbl);
+    bHotspots.appendChild(btn);
+  }
+};
 const showBrochurePage=(i)=>{
   if(!bData||!bData.pages||!bData.pages.length)return;
   bCur=Math.max(0,Math.min(i,bData.pages.length-1));
@@ -1290,7 +1331,9 @@ const showBrochurePage=(i)=>{
   if(bTot)bTot.textContent=String(bData.pages.length);
   if(bPrev)bPrev.disabled=bCur===0;
   if(bNext)bNext.disabled=bCur===bData.pages.length-1;
+  renderHotspots();
 };
+if(bHsToggle){bHsToggle.addEventListener('click',()=>{bHsPeek=!bHsPeek;if(bHotspots){bHotspots.classList.toggle('peek',bHsPeek);}bHsToggle.setAttribute('aria-pressed',String(bHsPeek));bHsToggle.textContent='Ürün kutuları: '+(bHsPeek?'Açık':'Kapalı');});if(bHotspots){bHotspots.classList.add('peek');}}
 const openBrochure=(i)=>{
   if(!bModal||!bData)return;
   renderBrochurePanel();
@@ -1307,6 +1350,13 @@ document.addEventListener('click',(ev)=>{
     ev.preventDefault();
     const i=parseInt(bpage.dataset.brochureIndex||'0',10)||0;
     openBrochure(i);
+    return;
+  }
+  const hs=ev.target.closest('.brochure-hotspot');
+  if(hs&&hs.dataset.product){
+    ev.preventDefault();
+    ev.stopPropagation();
+    try{openModal(JSON.parse(hs.dataset.product));}catch(e){}
     return;
   }
   const card=ev.target.closest('.product-card, .product-row');
@@ -1433,7 +1483,23 @@ function productPayloadMin(p) {
     color,
     url: p.url || "",
     badge: p.badge || "",
+    bbox: normalizeBbox(p.bbox),
   };
+}
+
+function normalizeBbox(b) {
+  if (!b) return null;
+  let obj = b;
+  if (typeof b === "string") {
+    try { obj = JSON.parse(b); } catch { return null; }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  const page = Number.isFinite(obj.page) ? Math.max(0, Math.floor(obj.page)) : 0;
+  const x = Number(obj.x), y = Number(obj.y), w = Number(obj.w), h = Number(obj.h);
+  if (![x, y, w, h].every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) return null;
+  if (x + w > 1.001 || y + h > 1.001) return null;
+  if (w <= 0 || h <= 0) return null;
+  return { page, x, y, w, h };
 }
 
 function orderMarkets(list, preferred) {
