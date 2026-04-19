@@ -1,0 +1,12 @@
+# /sosyal-data/ — yardimci dosyalar (index.json, uretilen PNG/MP4) burada.
+# Dogrudan dizin listelemesi kapali; .auth dosyasina erisim yasakli.
+
+Options -Indexes
+
+<Files ".auth">
+  Require all denied
+</Files>
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>

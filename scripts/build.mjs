@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile, readdir, copyFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { loadEnv } from "./lib/env.mjs";
 import { supabaseClient } from "./lib/supabase.mjs";
@@ -119,7 +119,27 @@ for (const page of corporatePages()) {
   await writeFile(path.join(dir, "index.html"), renderCorporate(page), "utf8");
 }
 
+// static/ altindaki dosyalari dist/'e aynen kopyala (ornek: sosyal.php, sosyal-data/.htaccess)
+await copyStaticTree(path.join(root, "static"), distDir);
+
 console.log(`Build tamamlandi -> ${distDir}`);
+
+async function copyStaticTree(srcRoot, dstRoot) {
+  let entries;
+  try { entries = await readdir(srcRoot, { withFileTypes: true }); }
+  catch { return; }
+  for (const e of entries) {
+    const src = path.join(srcRoot, e.name);
+    const dst = path.join(dstRoot, e.name);
+    if (e.isDirectory()) {
+      await mkdir(dst, { recursive: true });
+      await copyStaticTree(src, dst);
+    } else if (e.isFile()) {
+      await mkdir(path.dirname(dst), { recursive: true });
+      await copyFile(src, dst);
+    }
+  }
+}
 
 function renderHome() {
   const latestCatalogs = orderedMarkets
