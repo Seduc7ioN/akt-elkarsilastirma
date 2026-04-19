@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: "Max katalog sayisi (bos = hepsi)"
+        description: "Max image grup sayisi (bos = hepsi)"
         required: false
         default: ""
-      catalog:
-        description: "Tek katalog uuid (opsiyonel)"
+      image:
+        description: "Tek image URL (opsiyonel)"
         required: false
         default: ""
       dry:
@@ -44,7 +44,7 @@ jobs:
       - name: bbox enrich
         run: |
           ARGS=""
-          if [ -n "${{ inputs.catalog }}" ]; then ARGS="$ARGS --catalog=${{ inputs.catalog }}"; fi
+          if [ -n "${{ inputs.image }}" ]; then ARGS="$ARGS --image=${{ inputs.image }}"; fi
           if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit=${{ inputs.limit }}"; fi
           if [ "${{ inputs.dry }}" = "true" ]; then ARGS="$ARGS --dry"; fi
           node scripts/scraper/bbox-enrich.mjs $ARGS
