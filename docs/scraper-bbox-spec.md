@@ -68,3 +68,25 @@ Geçersiz bbox'lı ürünler broşür üzerinde hotspot göstermez ama ürün gr
 ## 5) Minimum viable
 
 Tüm ürünlere bbox şart değil. Scraper **en tık alacak / en büyük indirimli** 10-20 ürüne bbox yazsa yeterli — broşürün "canlı hissi" için bu kadarı algıyı değiştirir.
+
+## 6) `products.image` — ürünün KIRPILMIŞ görseli (ÖNEMLİ)
+
+Şu an scraper, ürünün `image` alanına **broşürün tüm sayfasını** koyuyor. Sonuç: ürün kartında ve ürün modalında "Söke Un" için de "Mayonez" için de aynı dev broşür sayfası görünüyor. Kötü UX.
+
+**Yapılması gereken:** `products.image` → o ürünün **bbox'a göre kırpılmış** küçük görseli olmalı. Broşür sayfası tamamı DEĞİL.
+
+Akış:
+1. Scraper bbox'u tespit etti.
+2. Broşür sayfası görselini indir (büyük orijinal).
+3. `x,y,w,h` ile crop et (ör. Sharp / Pillow / ImageMagick).
+4. Crop edilen parçayı ayrı bir URL'e yükle (S3, Supabase Storage, CDN).
+5. `products.image` = bu crop URL.
+
+Tercihen 3-4x çözünürlük için orijinal büyük sayfadan kırp (thumbnail'den değil). Hedef: ~600×600 px, 80 kalite JPG/WebP.
+
+**Geçiş dönemi:** Bbox'u olmayan ürünler için `products.image = null` bırakılabilir. Frontend placeholder gösterir; broşür sayfası bütün olarak asla ürün görseli yerine konmaz. (Build şu an bu durumu güvene almak için ürün görseli `cover_image` veya `pages[]`'den biriyle tamamen eşleşiyorsa otomatik olarak `null`'a çeviriyor — kalıcı çözüm yine de scraper tarafındaki crop.)
+
+## 7) Frontend'de şu an çalışan vs. bbox bekleyen davranış
+
+- ✅ **Hazır (bbox gerektirmez):** Broşür sayfasına tık → lightbox modal açılır; büyük görsel + o kataloğun tüm ürünleri kart olarak yan panelde. Ürüne tık → ürün modalı. Her markette tek tip çalışır. 0 ürünlü kataloglar sitede gösterilmez.
+- ⏳ **bbox gelince aktifleşecek:** Lightbox'taki büyük broşür görselinin üzerinde **tıklanabilir hotspot kutucukları** (ürünü direkt seçme). Spec yeterli, scraper tarafı hazırlandığında 1 günlük frontend entegrasyonu.
