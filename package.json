@@ -10,7 +10,12 @@
     "publish": "npm run build && npm run deploy:ftp",
     "social:spot": "node scripts/social/telegram-spot.mjs",
     "social:digest": "node scripts/social/telegram-digest.mjs",
-    "social:reels": "node scripts/social/reels/index.mjs"
+    "social:reels": "node scripts/social/reels/index.mjs",
+    "scraper:bbox": "node scripts/scraper/bbox-enrich.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "puppeteer": "^23.0.0"
