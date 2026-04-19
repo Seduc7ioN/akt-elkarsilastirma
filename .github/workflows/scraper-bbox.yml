@@ -1,0 +1,50 @@
+name: Scraper - bbox enrichment (Claude Vision)
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max katalog sayisi (bos = hepsi)"
+        required: false
+        default: ""
+      catalog:
+        description: "Tek katalog uuid (opsiyonel)"
+        required: false
+        default: ""
+      dry:
+        description: "Dry run (DB/Storage yazma)"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Her gun 04:00 UTC (07:00 TR) — yeni kataloglarda eksik bbox'lari doldur
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: scraper-bbox
+  cancel-in-progress: false
+
+jobs:
+  bbox:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: npm install
+        run: npm ci || npm install
+
+      - name: bbox enrich
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.catalog }}" ]; then ARGS="$ARGS --catalog=${{ inputs.catalog }}"; fi
+          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit=${{ inputs.limit }}"; fi
+          if [ "${{ inputs.dry }}" = "true" ]; then ARGS="$ARGS --dry"; fi
+          node scripts/scraper/bbox-enrich.mjs $ARGS
