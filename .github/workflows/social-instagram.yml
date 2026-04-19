@@ -1,0 +1,100 @@
+name: Social - Instagram Reels
+
+on:
+  workflow_dispatch:
+    inputs:
+      template:
+        description: "Reel sablonu"
+        required: true
+        default: "haftanin-firsatlari"
+        type: choice
+        options:
+          - haftanin-firsatlari
+          - fiyat-savasi
+          - fiyat-dustu
+          - uc-market
+      dry_run:
+        description: "Dry run (FTP/IG'ye gondermeden olustur)"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # TR = UTC+3
+    # Carsamba 09:00 TR -> Carsamba 06:00 UTC : haftanin-firsatlari
+    - cron: "0 6 * * 3"
+    # Pazartesi 09:00 TR -> Pazartesi 06:00 UTC : fiyat-savasi
+    - cron: "0 6 * * 1"
+    # Her gun 18:00 TR -> 15:00 UTC : fiyat-dustu
+    - cron: "0 15 * * *"
+    # Cuma 09:00 TR -> Cuma 06:00 UTC : uc-market
+    - cron: "0 6 * * 5"
+
+concurrency:
+  group: social-instagram
+  cancel-in-progress: false
+
+jobs:
+  reel:
+    runs-on: ubuntu-latest
+    env:
+      SITE_URL: ${{ secrets.SITE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      IG_HANDLE: ${{ vars.IG_HANDLE }}
+      SOCIAL_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: ffmpeg kurulumu
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: npm install
+        run: npm ci || npm install
+
+      - name: Puppeteer Chrome bagimliliklari
+        run: |
+          sudo apt-get install -y \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+            libpango-1.0-0 libasound2t64 libatspi2.0-0 libwayland-client0 || true
+
+      - name: Sablon secimi
+        id: pick
+        shell: bash
+        run: |
+          TMPL=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TMPL="${{ inputs.template }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 6 * * 3") TMPL="haftanin-firsatlari" ;;
+              "0 6 * * 1") TMPL="fiyat-savasi" ;;
+              "0 15 * * *") TMPL="fiyat-dustu" ;;
+              "0 6 * * 5") TMPL="uc-market" ;;
+              *) TMPL="fiyat-dustu" ;;
+            esac
+          fi
+          echo "template=$TMPL" >> $GITHUB_OUTPUT
+          echo "Secilen sablon: $TMPL"
+
+      - name: Reel olustur + yayinla
+        run: node scripts/social/reels/index.mjs --template=${{ steps.pick.outputs.template }}
+
+      - name: Artifact (hata durumunda PNG/MP4)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels-${{ steps.pick.outputs.template }}-${{ github.run_id }}
+          path: .reels-out/
+          if-no-files-found: ignore
+          retention-days: 7

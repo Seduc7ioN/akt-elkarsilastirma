@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  html,body{width:1080px;height:1920px;background:#0a0612;color:#fff;overflow:hidden}
+  body{background:radial-gradient(circle at 50% 20%,#2a0a14 0%,#0a0612 60%)}
+  .wrap{padding:70px 60px;height:100%;display:flex;flex-direction:column}
+  .handle{color:#9ca3af;font-size:28px;margin-bottom:24px}
+  .market-badge{width:200px;height:200px;border-radius:50%;background:{{marketColor}};display:flex;align-items:center;justify-content:center;margin:0 auto 28px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .market-badge span{font-size:64px;font-weight:900;color:#fff;letter-spacing:2px}
+  .title{text-align:center;font-size:58px;font-weight:900;color:#f87171;margin-bottom:44px;letter-spacing:1px}
+  .list{display:flex;flex-direction:column;gap:20px;flex:1}
+  .row{background:linear-gradient(90deg,#1a0710 0%,#2a0a16 100%);border:1px solid #3a0a1a;border-radius:18px;padding:22px 26px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:20px}
+  .pct{background:#dc2626;color:#fff;font-weight:900;font-size:28px;padding:10px 18px;border-radius:12px;white-space:nowrap}
+  .pname{font-size:34px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prices{text-align:right;white-space:nowrap}
+  .prices .new{font-size:42px;font-weight:900;color:#ef4444}
+  .prices .old{font-size:24px;color:#6b7280;text-decoration:line-through;margin-left:8px}
+  .footer{text-align:center;margin-top:24px}
+  .footer .note{color:#9ca3af;font-size:22px}
+  .footer .tags{color:#60a5fa;font-size:24px;margin-top:10px;font-weight:600}
+  .date{position:absolute;top:70px;right:60px;color:#9ca3af;font-size:26px}
+</style></head>
+<body>
+  <span class="date">{{dateRange}}</span>
+  <div class="wrap">
+    <div class="handle">{{handle}}</div>
+    <div class="market-badge"><span>{{marketShort}}</span></div>
+    <div class="title">🔥 HAFTANIN FIRSATLARI</div>
+    <div class="list">
+      {{#each items}}
+      <div class="row">
+        <div class="pct">-%{{pct}}</div>
+        <div class="pname">{{name}}</div>
+        <div class="prices"><span class="new">{{newPrice}}</span><span class="old">{{oldPrice}}</span></div>
+      </div>
+      {{/each}}
+    </div>
+    <div class="footer">
+      <div class="note">Tüketici bilgilendirme amaçlıdır · Ticari ilişki yoktur</div>
+      <div class="tags">{{hashtags}}</div>
+    </div>
+  </div>
+</body></html>
