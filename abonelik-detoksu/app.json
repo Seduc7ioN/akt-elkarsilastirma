@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Abonelik Detoksu",
+    "slug": "abonelik-detoksu",
+    "version": "1.0.0",
+    "description": "Aboneliklerini, kartlarini ve aylik toplam giderini tek ekranda takip et.",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "bundleIdentifier": "com.abonelikdetoksu.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.abonelikdetoksu.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
